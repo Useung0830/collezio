@@ -12,6 +12,22 @@ const eslintConfig = defineConfig([
       "simple-import-sort": simpleImportSort,
     },
     rules: {
+      "@typescript-eslint/no-unused-vars": "error",
+      "no-console": [
+        "error",
+        {
+          allow: ["warn", "error"],
+        },
+      ],
+      "jsx-a11y/alt-text": [
+        "error",
+        {
+          elements: ["img"],
+          img: ["Image"],
+        },
+      ],
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/no-static-element-interactions": "error",
       "simple-import-sort/imports": [
         "error",
         {
