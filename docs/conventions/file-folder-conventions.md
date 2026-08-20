@@ -1,3 +1,5 @@
+# 파일 및 폴더 컨벤션
+
 ## 기본 원칙
 
 - 파일과 폴더 이름만 보고 역할을 파악할 수 있도록 작성합니다.
@@ -7,7 +9,7 @@
 
 컴포넌트 파일은 `PascalCase`를 사용합니다.
 
-```
+```text
 ProductCard.tsx
 ProductList.tsx
 LoginForm.tsx
@@ -20,7 +22,7 @@ TradeModal.tsx
 
 Custom Hook은 `use`로 시작하며 `camelCase`를 사용합니다.
 
-```
+```text
 useAuth.ts
 useProducts.ts
 useModal.ts
@@ -31,7 +33,7 @@ useInfiniteProducts.ts
 
 Utility 함수 파일은 `camelCase`를 사용합니다.
 
-```
+```text
 formatPrice.ts
 formatDate.ts
 calculateTotalPrice.ts
@@ -44,7 +46,7 @@ validateEmail.ts
 
 전역 상태 Store는 `기능명 + Store.ts` 형식을 사용합니다.
 
-```
+```text
 authStore.ts
 tradeStore.ts
 modalStore.ts
@@ -54,7 +56,7 @@ modalStore.ts
 
 도메인 타입 파일은 `camelCase`를 사용합니다.
 
-```
+```text
 user.ts
 product.ts
 trade.ts
@@ -65,7 +67,7 @@ common.ts
 
 Next.js가 지정한 파일명은 프레임워크 규칙을 그대로 사용합니다.
 
-```
+```text
 page.tsx
 layout.tsx
 loading.tsx
@@ -79,7 +81,7 @@ proxy.ts
 
 폴더는 기본적으로 소문자를 사용합니다.
 
-```
+```text
 components/
 hooks/
 utils/
@@ -90,7 +92,7 @@ services/
 
 여러 단어가 필요한 경우 `kebab-case`를 사용합니다.
 
-```
+```text
 product-detail/
 trade-request/
 user-profile/
@@ -159,7 +161,7 @@ import ProductImage from "./ProductImage";
 
 이미지 파일은 영문 소문자 `kebab-case`를 사용합니다.
 
-```
+```text
 login-banner.png
 profile-default.png
 product-placeholder.webp
@@ -168,7 +170,7 @@ main-hero-image.webp
 
 반응형 이미지도 `kebab-case`를 사용합니다.
 
-```
+```text
 main-banner-mobile.webp
 main-banner-tablet.webp
 main-banner-desktop.webp
@@ -176,7 +178,7 @@ main-banner-desktop.webp
 
 다음 형식은 사용하지 않습니다.
 
-```
+```text
 login_banner.png
 mainHeroImage.png
 로그인배너.png

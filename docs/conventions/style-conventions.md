@@ -1,3 +1,5 @@
+# 스타일 컨벤션
+
 코드 포맷 관련 규칙은 사람이 직접 맞추기보다 ESLint와 Prettier를 이용해 자동화합니다.
 
 자동화 가능한 규칙은 개인 판단으로 파일마다 다르게 작성하지 않습니다.
@@ -50,16 +52,19 @@ const product = getProduct();
 
 ```tsx
 // 지양
-if (isLoggedIn === true) {}
+if (isLoggedIn === true) {
+}
 
 // 권장
-if (isLoggedIn) {}
+if (isLoggedIn) {
+}
 ```
 
 반대 조건은 `!`를 사용합니다.
 
 ```tsx
-if (!isLoggedIn) {}
+if (!isLoggedIn) {
+}
 ```
 
 ## 불필요한 코드
@@ -107,10 +112,7 @@ Tailwind CSS를 사용하는 경우 동일한 역할의 컴포넌트에서 클�
 이미지에는 의미에 맞는 `alt`를 작성합니다.
 
 ```tsx
-<img
-  src={product.image}
-  alt={`${product.name} 상품 이미지`}
-/>
+<img src={product.image} alt={`${product.name} 상품 이미지`} />
 ```
 
 장식용 이미지는 빈 `alt`를 사용할 수 있습니다.

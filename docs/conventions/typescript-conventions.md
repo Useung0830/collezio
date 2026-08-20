@@ -1,4 +1,6 @@
-# any 사용 지양
+# TypeScript 컨벤션
+
+## any 사용 지양
 
 `any`는 가능한 한 사용하지 않습니다.
 
@@ -46,10 +48,7 @@ type ProductCardProps = {
   onSelect: (id: number) => void;
 };
 
-function ProductCard({
-  product,
-  onSelect,
-}: ProductCardProps) {
+function ProductCard({ product, onSelect }: ProductCardProps) {
   // ...
 }
 ```
@@ -59,11 +58,7 @@ function ProductCard({
 제한된 문자열 값은 `string`보다 Union Type을 사용합니다.
 
 ```tsx
-type TradeStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "completed";
+type TradeStatus = "pending" | "accepted" | "rejected" | "completed";
 ```
 
 ## Optional 값
@@ -99,7 +94,7 @@ const user = data as User;
 
 여러 영역에서 공통으로 사용하는 타입은 별도 파일로 분리합니다.
 
-```
+```text
 types/
 ├── user.ts
 ├── product.ts

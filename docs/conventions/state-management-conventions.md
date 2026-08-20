@@ -1,3 +1,5 @@
+# 상태 관리 컨벤션
+
 ## 상태 관리 기준
 
 상태의 종류에 따라 관리 방법을 구분합니다.
@@ -68,7 +70,7 @@ API에서 가져오는 서버 데이터는 TanStack Query를 사용합니다.
 - 정렬 방식
 - 필터
 
-```
+```text
 /products?category=figure&page=2&sort=latest
 ```
 

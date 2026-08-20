@@ -1,4 +1,6 @@
-# 하나의 책임
+# 함수 컨벤션
+
+## 하나의 책임
 
 함수는 하나의 명확한 역할을 담당하도록 작성합니다.
 
@@ -65,12 +67,14 @@ createProduct({
 
 ```tsx
 // 지양
-if (file.size > 5242880) {}
+if (file.size > 5242880) {
+}
 
 // 권장
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-if (file.size > MAX_FILE_SIZE) {}
+if (file.size > MAX_FILE_SIZE) {
+}
 ```
 
 ## 중복 코드

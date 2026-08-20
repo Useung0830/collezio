@@ -1,8 +1,10 @@
-# 브랜치 구조
+# Git 컨벤션
+
+## 브랜치 구조
 
 프로젝트는 기본적으로 다음 브랜치를 사용합니다.
 
-```
+```text
 main
 └── develop
     ├── feat/12-login-page
@@ -54,7 +56,7 @@ GitHub Issue에 등록된 기능을 구현하는 브랜치입니다.
 
 배포 전 별도의 QA 또는 버전 관리가 필요한 경우 선택적으로 사용합니다.
 
-```
+```text
 release/1.0.0
 ```
 
@@ -98,7 +100,7 @@ release/1.0.0
 
 권장:
 
-```
+```text
 #12 로그인 페이지 구현
 #13 소셜 로그인 구현
 #14 상품 등록 구현
@@ -106,7 +108,7 @@ release/1.0.0
 
 지양:
 
-```
+```text
 #12 로그인 + 회원가입 + 마이페이지 + 프로필 수정
 ```
 
@@ -118,7 +120,7 @@ release/1.0.0
 
 기본 상태는 다음과 같이 사용합니다.
 
-```
+```text
 Todo
 → In Progress
 → Review
@@ -147,13 +149,13 @@ Pull Request가 병합되어 완료된 작업
 
 ### 기능 개발
 
-```
+```text
 feat/이슈번호-기능명
 ```
 
 예시:
 
-```
+```text
 feat/12-login-page
 feat/18-product-create
 feat/25-profile-edit
@@ -161,61 +163,61 @@ feat/25-profile-edit
 
 ### 버그 수정
 
-```
+```text
 fix/이슈번호-수정내용
 ```
 
 예시:
 
-```
+```text
 fix/31-login-redirect
 ```
 
 ### 리팩토링
 
-```
+```text
 refactor/이슈번호-작업내용
 ```
 
 예시:
 
-```
+```text
 refactor/42-product-card
 ```
 
 ### 문서
 
-```
+```text
 docs/이슈번호-작업내용
 ```
 
 예시:
 
-```
+```text
 docs/51-readme
 ```
 
 ### 긴급 수정
 
-```
+```text
 hotfix/이슈번호-수정내용
 ```
 
 예시:
 
-```
+```text
 hotfix/63-auth-error
 ```
 
 ### Release
 
-```
+```text
 release/버전
 ```
 
 예시:
 
-```
+```text
 release/1.0.0
 ```
 
@@ -238,7 +240,7 @@ release/1.0.0
 
 예를 들어 로그인 기능을 구현한다면 다음과 같이 나눌 수 있습니다.
 
-```
+```text
 feat: 로그인 폼 UI 구현
 feat: 로그인 API 연동
 feat: 로그인 입력값 검증 추가
@@ -260,7 +262,7 @@ fix: 로그인 실패 메시지 표시 오류 수정
 
 예시:
 
-```
+```text
 feat: 상품 등록 폼 UI 구현
 feat: 상품 이미지 업로드 기능 추가
 feat: 상품 등록 API 연동
@@ -283,7 +285,7 @@ fix: 이미지 삭제 후 미리보기가 유지되는 오류 수정
 
 다음 형식을 사용합니다.
 
-```
+```text
 type: 작업 내용
 ```
 
@@ -299,7 +301,7 @@ type: 작업 내용
 
 예시:
 
-```
+```text
 feat: 로그인 폼 UI 구현
 feat: 상품 등록 API 연동
 fix: 로그인 리다이렉트 오류 수정
@@ -312,7 +314,7 @@ test: 로그인 validation 테스트 추가
 
 다음과 같이 작업 내용을 알 수 없는 메시지는 사용하지 않습니다.
 
-```
+```text
 수정
 수정2
 최종
@@ -326,14 +328,14 @@ asdf
 
 권장:
 
-```
+```text
 feat: 로그인 기능 구현
 style: 헤더 디자인 수정
 ```
 
 지양:
 
-```
+```text
 feat: 로그인 구현 및 헤더 디자인 수정
 ```
 
@@ -343,7 +345,7 @@ feat: 로그인 구현 및 헤더 디자인 수정
 
 기능 개발 완료 후 작업 브랜치에서 `develop`을 대상으로 Pull Request를 생성합니다.
 
-```
+```text
 feat/12-login-page
         ↓
        PR
@@ -353,19 +355,19 @@ feat/12-login-page
 
 PR 제목은 다음 형식을 사용합니다.
 
-```
+```text
 [#이슈번호] 작업 내용
 ```
 
 예시:
 
-```
+```text
 [#12] 로그인 페이지 구현
 ```
 
 Issue 자동 종료가 필요한 경우 PR 본문에 다음 문구를 작성합니다.
 
-```
+```text
 Closes #12
 ```
 

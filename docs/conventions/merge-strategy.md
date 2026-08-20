@@ -1,17 +1,19 @@
-# 기본 전략
+# 머지 전략
+
+## 기본 전략
 
 브랜치의 목적에 따라 Merge 방식을 구분합니다.
 
-| Merge 방향 | 전략 |
-| --- | --- |
-| `feat/*` → `develop` | Squash Merge |
-| `fix/*` → `develop` | Squash Merge |
+| Merge 방향               | 전략         |
+| ------------------------ | ------------ |
+| `feat/*` → `develop`     | Squash Merge |
+| `fix/*` → `develop`      | Squash Merge |
 | `refactor/*` → `develop` | Squash Merge |
-| `docs/*` → `develop` | Squash Merge |
-| `develop` → `main` | Merge Commit |
-| `release/*` → `main` | Merge Commit |
-| `hotfix/*` → `main` | Merge Commit |
-| `hotfix/*` → `develop` | Merge Commit |
+| `docs/*` → `develop`     | Squash Merge |
+| `develop` → `main`       | Merge Commit |
+| `release/*` → `main`     | Merge Commit |
+| `hotfix/*` → `main`      | Merge Commit |
+| `hotfix/*` → `develop`   | Merge Commit |
 
 ---
 
@@ -19,7 +21,7 @@
 
 기능 브랜치를 `develop`에 병합할 때는 **Squash Merge**를 사용합니다.
 
-```
+```text
 feat/12-login-page
         ↓
    Squash Merge
@@ -29,7 +31,7 @@ feat/12-login-page
 
 기능 개발 과정에서는 작업 내용을 구분해 여러 커밋을 작성할 수 있습니다.
 
-```
+```text
 feat: 로그인 폼 UI 구현
 feat: 로그인 입력값 검증 추가
 feat: 로그인 API 연동
@@ -38,7 +40,7 @@ fix: 로그인 에러 메시지 수정
 
 하지만 Pull Request가 `develop`에 병합될 때는 하나의 커밋으로 합칩니다.
 
-```
+```text
 feat: 로그인 기능 구현 (#12)
 ```
 
@@ -58,13 +60,13 @@ Squash Merge 시 최종 커밋 메시지는 해당 Issue의 주요 작업 내용
 
 형식:
 
-```
+```text
 type: 작업 내용 (#이슈번호)
 ```
 
 예시:
 
-```
+```text
 feat: 로그인 기능 구현 (#12)
 
 feat: 상품 등록 기능 구현 (#18)
@@ -82,7 +84,7 @@ PR 안에서는 여러 커밋이 존재할 수 있지만 `develop`에는 하나�
 
 배포 시 `develop`을 `main`으로 병합할 때는 **Merge Commit**을 사용합니다.
 
-```
+```text
 develop
    ↓
 Merge Commit
@@ -92,13 +94,13 @@ Merge Commit
 
 예:
 
-```
+```text
 Merge develop into main for v1.0.0
 ```
 
 또는
 
-```
+```text
 release: v1.0.0
 ```
 
@@ -108,7 +110,7 @@ release: v1.0.0
 
 예:
 
-```
+```text
 main
 
 ● v1.0.0 배포
@@ -128,7 +130,7 @@ main
 
 Release Branch가 필요한 경우 `develop`에서 생성합니다.
 
-```
+```text
 develop
    ↓
 release/1.0.0
@@ -148,7 +150,7 @@ Release Branch에서는 새로운 기능을 추가하지 않습니다.
 
 배포 준비가 완료되면 `main`에 Merge Commit으로 병합합니다.
 
-```
+```text
 release/1.0.0
        ↓
   Merge Commit
@@ -158,7 +160,7 @@ release/1.0.0
 
 Release 과정에서 수정된 코드가 있다면 `develop`에도 반영합니다.
 
-```
+```text
 release/1.0.0
      ├── main
      └── develop
@@ -166,7 +168,7 @@ release/1.0.0
 
 프로젝트 규모가 작고 별도의 QA 과정이 없다면 Release Branch는 사용하지 않고 다음 흐름을 사용합니다.
 
-```
+```text
 develop
    ↓
  main
@@ -178,7 +180,7 @@ develop
 
 이미 배포된 `main`에서 긴급한 문제가 발생한 경우 `hotfix` 브랜치를 생성합니다.
 
-```
+```text
 main
  ↓
 hotfix/63-auth-error
@@ -186,7 +188,7 @@ hotfix/63-auth-error
 
 수정이 완료되면 `main`으로 Merge Commit합니다.
 
-```
+```text
 hotfix/63-auth-error
         ↓
    Merge Commit
@@ -196,7 +198,7 @@ hotfix/63-auth-error
 
 같은 문제가 이후 개발 코드에 다시 발생하지 않도록 변경사항을 `develop`에도 반영합니다.
 
-```
+```text
 hotfix/63-auth-error
       ├── main
       └── develop
@@ -243,7 +245,7 @@ git rebase develop
 
 충돌 표시를 그대로 Commit하지 않도록 주의합니다.
 
-```
+```text
 <<<<<<< HEAD
 =======
 >>>>>>> develop
@@ -271,7 +273,7 @@ Merge 전에 다음 항목을 확인합니다.
 
 Feature Branch가 `develop`에 정상적으로 병합되면 해당 작업 브랜치는 삭제합니다.
 
-```
+```text
 feat/12-login-page
         ↓
      develop
@@ -289,7 +291,7 @@ GitHub Issue가 정상적으로 종료되었는지 확인하고 GitHub Projects 
 
 일반적인 기능 개발:
 
-```
+```text
 GitHub Issue #12
         ↓
 feat/12-login-page
@@ -305,7 +307,7 @@ develop
 
 배포:
 
-```
+```text
 develop
    ↓
 Merge Commit
@@ -317,7 +319,7 @@ Merge Commit
 
 긴급 수정:
 
-```
+```text
 main
  ↓
 hotfix/*

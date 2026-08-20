@@ -173,17 +173,17 @@ features/product/
 
 ## 네이밍 규칙
 
-| 대상 | 규칙 | 예시 |
-| --- | --- | --- |
-| React 컴포넌트 | PascalCase | `ProductCard.tsx` |
-| React 훅 | `use` + PascalCase | `useProductQuery.ts` |
-| API 함수 | 동사 + 대상 | `getProduct.ts`, `createPost.ts` |
-| Query Key | 도메인 + `QueryKeys` | `productQueryKeys.ts` |
-| 스키마 | 대상 + `Schema` | `productSchema.ts` |
-| 일반 TS 파일 | camelCase | `formatPrice.ts` |
-| 라우트 폴더 | 소문자 kebab-case | `community`, `my-page` |
-| 동적 라우트 | camelCase 식별자 | `[productId]` |
-| 에셋 파일 | 소문자 kebab-case | `icon-arrow-right.svg` |
+| 대상           | 규칙                 | 예시                             |
+| -------------- | -------------------- | -------------------------------- |
+| React 컴포넌트 | PascalCase           | `ProductCard.tsx`                |
+| React 훅       | `use` + PascalCase   | `useProductQuery.ts`             |
+| API 함수       | 동사 + 대상          | `getProduct.ts`, `createPost.ts` |
+| Query Key      | 도메인 + `QueryKeys` | `productQueryKeys.ts`            |
+| 스키마         | 대상 + `Schema`      | `productSchema.ts`               |
+| 일반 TS 파일   | camelCase            | `formatPrice.ts`                 |
+| 라우트 폴더    | 소문자 kebab-case    | `community`, `my-page`           |
+| 동적 라우트    | camelCase 식별자     | `[productId]`                    |
+| 에셋 파일      | 소문자 kebab-case    | `icon-arrow-right.svg`           |
 
 ## 의존성 방향
 

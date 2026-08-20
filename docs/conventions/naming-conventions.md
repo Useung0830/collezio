@@ -1,3 +1,5 @@
+# 네이밍 컨벤션
+
 ## 기본 원칙
 
 - 이름만 보고 변수, 함수, 컴포넌트의 역할을 파악할 수 있도록 작성합니다.
@@ -99,7 +101,7 @@ Props로 전달하는 이벤트는 `on`을 사용합니다.
 
 React 컴포넌트는 `PascalCase`를 사용합니다.
 
-```
+```text
 ProductCard
 ProductList
 LoginForm

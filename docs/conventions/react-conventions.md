@@ -1,3 +1,5 @@
+# React 컨벤션
+
 ## 컴포넌트 내부 순서
 
 컴포넌트 내부에서는 다음 순서를 기본으로 합니다.
@@ -43,7 +45,7 @@ function ProductCard({ product }: ProductCardProps) {
 
 예시:
 
-```
+```text
 ProductDetail
 ├── ProductGallery
 ├── ProductInfo
@@ -66,10 +68,7 @@ Props는 필요한 값만 전달합니다.
 공용 컴포넌트와 객체의 일부 값만 사용하는 컴포넌트에는 필요한 값만 전달합니다.
 
 ```tsx
-<Avatar
-  imageUrl={user.profileImage}
-  alt={user.nickname}
-/>
+<Avatar imageUrl={user.profileImage} alt={user.nickname} />
 ```
 
 ## Props Drilling
@@ -85,15 +84,16 @@ Props는 필요한 값만 전달합니다.
 단순한 조건은 JSX 내부에서 처리합니다.
 
 ```tsx
-{isLoggedIn && <Profile />}
+{
+  isLoggedIn && <Profile />;
+}
 ```
 
 조건이 복잡하다면 별도의 변수로 분리합니다.
 
 ```tsx
 const isTradeAvailable =
-  product.status === "available" &&
-  product.userId !== currentUser.id;
+  product.status === "available" && product.userId !== currentUser.id;
 ```
 
 ## Key
@@ -101,12 +101,7 @@ const isTradeAvailable =
 목록 렌더링에서는 고유하고 안정적인 값을 `key`로 사용합니다.
 
 ```tsx
-products.map((product) => (
-  <ProductCard
-    key={product.id}
-    product={product}
-  />
-));
+products.map((product) => <ProductCard key={product.id} product={product} />);
 ```
 
 가능한 경우 배열 index를 `key`로 사용하지 않습니다.
