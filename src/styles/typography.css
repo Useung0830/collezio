@@ -1,0 +1,95 @@
+.text-display-40 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  line-height: normal;
+  letter-spacing: -0.025em;
+}
+
+.text-heading-32 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-heading-24 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-heading-20 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-body-18 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-body-16 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-body-14 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-label-16 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-label-14 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-caption-13 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-caption-12-bold {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}
+
+.text-caption-12 {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: normal;
+  letter-spacing: -0.004em;
+}

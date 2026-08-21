@@ -1,0 +1,38 @@
+@import "tailwindcss";
+@import "../styles/typography.css";
+
+@theme {
+  --color-black-900: #111111;
+  --color-black-800: #2b2b2b;
+  --color-black-700: #444444;
+  --color-black-600: #666666;
+  --color-black-500: #888888;
+  --color-black-400: #aaaaaa;
+  --color-black-300: #cccccc;
+  --color-black-200: #e5e5e5;
+  --color-black-100: #f3f3f3;
+  --color-black-50: #fafafa;
+  --color-white: #ffffff;
+
+  --color-brand-blue: #515ff4;
+  --color-brand-green: #82d917;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
