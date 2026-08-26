@@ -25,6 +25,10 @@ src/
 │   ├── error.tsx                # 루트 에러 UI
 │   ├── not-found.tsx            # 404 UI
 │   ├── globals.css              # 전역 스타일
+│   ├── (auth)/                  # 인증 화면 라우트 그룹 (URL에는 미포함)
+│   │   ├── login/page.tsx       # 로그인 (/login)
+│   │   ├── signup/page.tsx      # 회원가입 (/signup)
+│   │   └── find-password/page.tsx # 비밀번호 찾기 (/find-password)
 │   ├── products/
 │   │   ├── [productId]/page.tsx # 상품 상세 (/products/:productId)
 │   │   └── new/page.tsx         # 상품 등록 (/products/new)

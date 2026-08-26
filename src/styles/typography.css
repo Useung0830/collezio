@@ -41,7 +41,7 @@
 .text-body-16 {
   font-family: var(--font-pretendard, Pretendard), sans-serif;
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 300;
   line-height: normal;
   letter-spacing: -0.004em;
 }
@@ -49,7 +49,7 @@
 .text-body-14 {
   font-family: var(--font-pretendard, Pretendard), sans-serif;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 300;
   line-height: normal;
   letter-spacing: -0.004em;
 }
