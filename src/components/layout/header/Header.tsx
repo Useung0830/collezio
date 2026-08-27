@@ -8,7 +8,7 @@ import LogoGnb from "@/assets/images/logo_gnb.svg";
 
 export default function Header() {
   return (
-    <header className="flex w-full items-center justify-center py-3">
+    <header className="flex w-full items-center justify-center px-4 py-3 max-lg:px-3">
       <div className="flex w-full max-w-280 items-center justify-between">
         <Link href="/" className="shrink-0">
           <LogoGnb className="h-8.75 w-32" aria-label="콜레지오 로고" />

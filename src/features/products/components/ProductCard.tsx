@@ -33,11 +33,12 @@ export default function ProductCard({
   return (
     <Link href={`/products/${product.id}`}>
       <article className="flex flex-col gap-4">
-        <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-100">
+        <div className="relative aspect-square w-full overflow-hidden rounded-2xl">
           <Image
             src={product.image}
             alt={product.title}
             fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
             className="object-cover"
           />
         </div>
@@ -62,11 +63,11 @@ export default function ProductCard({
             <div className="flex gap-1">
               <div className="flex items-center gap-0.5">
                 <HeartIcon className="size-4" />
-                <span>{product.chatCount}</span>
+                <span>{product.favoriteCount}</span>
               </div>
               <div className="flex items-center gap-0.5">
                 <ChatIcon className="size-4" />
-                <span>{product.favoriteCount}</span>
+                <span>{product.chatCount}</span>
               </div>
             </div>
             <p>{"\u00B7"}</p>
