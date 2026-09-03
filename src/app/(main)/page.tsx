@@ -1,7 +1,7 @@
 import NewProductList from "@/features/products/components/NewProductList";
 import PopularProductList from "@/features/products/components/PopularProductList";
 
-import bannerImage from "@/assets/images/ad_banner_main.jpg";
+import bannerImage from "@/assets/images/ad-banner-main.jpg";
 
 export default function Home() {
   return (

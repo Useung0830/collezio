@@ -1,11 +1,11 @@
 import Link from "next/link";
 
-import EmailIcon from "@/assets/icons/icon_email.svg";
-import VisibilityIcon from "@/assets/icons/icon_eye-thin.svg";
-import GooleLogoIcon from "@/assets/icons/icon_google-logo.svg";
-import KakaoLogoIcon from "@/assets/icons/icon_kakao-logo.svg";
-import PasswordIcon from "@/assets/icons/icon_lock.svg";
-import LogoGnb from "@/assets/images/logo_gnb.svg";
+import EmailIcon from "@/assets/icons/icon-email.svg";
+import VisibilityIcon from "@/assets/icons/icon-eye-thin.svg";
+import GooleLogoIcon from "@/assets/icons/icon-google-logo.svg";
+import KakaoLogoIcon from "@/assets/icons/icon-kakao-logo.svg";
+import PasswordIcon from "@/assets/icons/icon-lock.svg";
+import LogoGnb from "@/assets/images/logo-gnb.svg";
 
 export default function LoginPage() {
   return (

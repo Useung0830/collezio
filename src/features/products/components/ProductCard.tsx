@@ -5,8 +5,8 @@ import type { ProductListItem } from "@/features/products/types/product";
 
 import formatRelativeTime from "@/utils/formatRelativeTime";
 
-import ChatIcon from "@/assets/icons/icon_chat.svg";
-import HeartIcon from "@/assets/icons/icon_heart.svg";
+import ChatIcon from "@/assets/icons/icon-chat.svg";
+import HeartIcon from "@/assets/icons/icon-heart.svg";
 
 interface ProductCardProps {
   product: ProductListItem;
@@ -22,7 +22,7 @@ export default function ProductCard({
 
   const transactionLabel =
     product.transaction.type === "sale"
-      ? `${product.transaction.price}원`
+      ? `${product.transaction.price.toLocaleString("ko-KR")}원`
       : `${product.transaction.desiredItemName}`;
 
   const titleClassName = size === "compact" ? "text-body-16" : "text-body-18";

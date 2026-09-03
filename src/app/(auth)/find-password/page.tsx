@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import EmailIcon from "@/assets/icons/icon_email.svg";
-import LogoGnb from "@/assets/images/logo_gnb.svg";
+import EmailIcon from "@/assets/icons/icon-email.svg";
+import LogoGnb from "@/assets/images/logo-gnb.svg";
 
 export default function FindPasswordPage() {
   return (

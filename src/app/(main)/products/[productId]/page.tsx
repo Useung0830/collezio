@@ -6,9 +6,9 @@ import { getProductDetail } from "@/features/products/services/getProductDetail"
 
 import formatRelativeTime from "@/utils/formatRelativeTime";
 
-import HeartOutlineIcon from "@/assets/icons/icon_heart-outline.svg";
-import KebabIcon from "@/assets/icons/icon_kebab.svg";
-import StarIcon from "@/assets/icons/icon_star.svg";
+import HeartOutlineIcon from "@/assets/icons/icon-heart-outline.svg";
+import KebabIcon from "@/assets/icons/icon-kebab.svg";
+import StarIcon from "@/assets/icons/icon-star.svg";
 
 export default async function ProductDetailPage(
   props: PageProps<"/products/[productId]">,
