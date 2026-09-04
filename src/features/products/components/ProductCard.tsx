@@ -25,25 +25,35 @@ export default function ProductCard({
       ? `${product.transaction.price.toLocaleString("ko-KR")}원`
       : `${product.transaction.desiredItemName}`;
 
-  const titleClassName = size === "compact" ? "text-body-16" : "text-body-18";
+  const titleClassName =
+    size === "compact"
+      ? "text-body-14 sm:text-body-16"
+      : "text-body-16 sm:text-body-18";
 
   const transactionClassName =
-    size === "compact" ? "text-heading-20" : "text-heading-24";
+    size === "compact"
+      ? "text-label-16 sm:text-heading-20"
+      : "text-heading-20 sm:text-heading-24";
+
+  const imageSizes =
+    size === "compact"
+      ? "(min-width: 1024px) 214px, (min-width: 640px) 33vw, 50vw"
+      : "(min-width: 768px) 268px, 50vw";
 
   return (
     <Link href={`/products/${product.id}`}>
-      <article className="flex flex-col gap-4">
+      <article className="flex flex-col gap-3 sm:gap-4">
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl">
           <Image
             src={product.image}
             alt={product.title}
             fill
-            sizes="(min-width: 1024px) 50vw, 100vw"
+            sizes={imageSizes}
             className="object-cover"
           />
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:gap-3">
           <h3 className={`${titleClassName} text-black-900`}>
             {product.title}
           </h3>
@@ -59,7 +69,7 @@ export default function ProductCard({
               {transactionLabel}
             </p>
           </div>
-          <div className="text-black-600 text-body-16 flex items-center gap-2">
+          <div className="text-caption-13 text-black-600 sm:text-body-16 flex items-center gap-2">
             <div className="flex gap-1">
               <div className="flex items-center gap-0.5">
                 <HeartIcon className="size-4" />
