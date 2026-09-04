@@ -1,80 +1,28 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import ImageUploader from "@/components/common/ImageUploader";
+
 import CloseIcon from "@/assets/icons/icon-close.svg";
-import GalleryIcon from "@/assets/icons/icon-gallery.svg";
 import RightIcon from "@/assets/icons/icon-right.svg";
 
 import SelectionButton from "./SelectionButton";
 
-const MAX_IMAGE_COUNT = 10;
-
 type TransactionType = "exchange" | "sale";
 type DeliveryType = "direct" | "parcel";
-
-type ProductImage = {
-  id: string;
-  name: string;
-  url: string;
-};
 
 export default function NewProductForm() {
   const router = useRouter();
 
-  const [images, setImages] = useState<ProductImage[]>([]);
   const [transactionType, setTransactionType] =
     useState<TransactionType>("exchange");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("direct");
   const [shippingFee, setShippingFee] = useState("");
   const [isFreeShipping, setIsFreeShipping] = useState(false);
 
-  const imageUrls = useRef(new Set<string>());
-
-  useEffect(() => {
-    const uploadedImageUrls = imageUrls.current;
-
-    return () => {
-      uploadedImageUrls.forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, []);
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(event.target.files ?? []);
-    const availableCount = MAX_IMAGE_COUNT - images.length;
-
-    const newImages = selectedFiles.slice(0, availableCount).map((file) => {
-      const url = URL.createObjectURL(file);
-      imageUrls.current.add(url);
-
-      return {
-        id: `${file.name}-${file.lastModified}-${url}`,
-        name: file.name,
-        url,
-      };
-    });
-
-    setImages((currentImages) => [...currentImages, ...newImages]);
-    event.target.value = "";
-  };
-
-  const handleImageRemove = (imageId: string) => {
-    setImages((currentImages) => {
-      const removedImage = currentImages.find((image) => image.id === imageId);
-
-      if (removedImage) {
-        URL.revokeObjectURL(removedImage.url);
-        imageUrls.current.delete(removedImage.url);
-      }
-
-      return currentImages.filter((image) => image.id !== imageId);
-    });
-  };
-
   const handleClose = () => {
-    imageUrls.current.forEach((url) => URL.revokeObjectURL(url));
     router.back();
   };
 
@@ -91,56 +39,7 @@ export default function NewProductForm() {
       </div>
 
       <form className="flex flex-col gap-7">
-        <fieldset className="flex flex-col gap-3">
-          <legend className="sr-only">상품 사진</legend>
-          <div className="flex gap-3 overflow-x-auto pt-1 pr-1">
-            <label className="border-black-300 text-black-400 flex size-24 shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border">
-              <GalleryIcon className="size-7" aria-hidden="true" />
-              <span className="text-body-14">
-                {images.length}/{MAX_IMAGE_COUNT}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                disabled={images.length >= MAX_IMAGE_COUNT}
-                onChange={handleImageUpload}
-              />
-            </label>
-
-            {images.map((image, index) => (
-              <div
-                key={image.id}
-                className="relative size-24 shrink-0 overflow-visible"
-              >
-                <div className="bg-black-100 relative size-full overflow-hidden rounded-2xl">
-                  <Image
-                    src={image.url}
-                    alt={image.name}
-                    fill
-                    unoptimized
-                    sizes="96px"
-                    className="object-cover"
-                  />
-                  {index === 0 && (
-                    <span className="text-caption-12-bold absolute right-0 bottom-0 left-0 bg-black/70 py-1 text-center text-white">
-                      대표 사진
-                    </span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="border-black-200 text-black-900 absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border bg-white"
-                  aria-label={`${image.name} 삭제`}
-                  onClick={() => handleImageRemove(image.id)}
-                >
-                  <CloseIcon className="size-3.5" aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </fieldset>
+        <ImageUploader maxImageCount={10} showRepresentativeLabel />
 
         <label className="text-label-16 text-black-900 flex flex-col gap-3">
           제목

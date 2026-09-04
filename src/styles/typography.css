@@ -46,6 +46,14 @@
   letter-spacing: -0.004em;
 }
 
+.text-body-16-relaxed {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.75;
+  letter-spacing: -0.004em;
+}
+
 .text-body-14 {
   font-family: var(--font-pretendard, Pretendard), sans-serif;
   font-size: 14px;
