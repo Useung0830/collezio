@@ -12,9 +12,14 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.firebase/
+firebase-debug*.log
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production

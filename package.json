@@ -12,6 +12,9 @@
     "format:check": "prettier . --check",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run format:check",
+    "test:e2e": "firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth \"playwright test\"",
+    "test:e2e:headed": "firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth \"playwright test --headed\"",
+    "test:e2e:report": "playwright show-report",
     "prepare": "husky"
   },
   "dependencies": {
@@ -23,6 +26,7 @@
     "react-toastify": "^11.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@svgr/webpack": "^8.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -33,6 +37,7 @@
     "eslint-config-next": "16.3.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-simple-import-sort": "14.0.0",
+    "firebase-tools": "^15.29.0",
     "husky": "9.1.7",
     "lint-staged": "17.3.0",
     "prettier": "3.9.6",

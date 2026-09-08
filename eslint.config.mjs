@@ -54,6 +54,10 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-e2e/**",
+    "playwright-report/**",
+    "test-results/**",
+    ".firebase/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
