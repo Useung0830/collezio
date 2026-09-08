@@ -53,6 +53,7 @@ export function useSignupForm() {
   };
 
   return {
+    control,
     register,
     getValues,
     errors,

@@ -1,8 +1,9 @@
 import type {
-  FieldErrors,
+  Control,
   UseFormGetValues,
   UseFormRegister,
 } from "react-hook-form";
+import { useFormState } from "react-hook-form";
 
 import type { SignupFormValues } from "@/features/auth/types/signup";
 
@@ -12,16 +13,22 @@ import PasswordIcon from "@/assets/icons/icon-lock.svg";
 import AuthInputField from "./AuthInputField";
 
 type SignupPasswordFieldsProps = {
+  control: Control<SignupFormValues>;
   register: UseFormRegister<SignupFormValues>;
   getValues: UseFormGetValues<SignupFormValues>;
-  errors: Pick<FieldErrors<SignupFormValues>, "password" | "confirmPassword">;
 };
 
 export default function SignupPasswordFields({
+  control,
   register,
   getValues,
-  errors,
 }: SignupPasswordFieldsProps) {
+  const { errors } = useFormState({
+    control,
+    name: ["password", "confirmPassword"],
+    exact: true,
+  });
+
   return (
     <>
       <AuthInputField

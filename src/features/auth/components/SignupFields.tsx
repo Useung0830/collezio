@@ -1,8 +1,9 @@
 import type {
-  FieldErrors,
+  Control,
   UseFormGetValues,
   UseFormRegister,
 } from "react-hook-form";
+import { useFormState } from "react-hook-form";
 
 import type { SignupFormValues } from "@/features/auth/types/signup";
 
@@ -13,16 +14,22 @@ import AuthInputField from "./AuthInputField";
 import SignupPasswordFields from "./SignupPasswordFields";
 
 type SignupFieldsProps = {
+  control: Control<SignupFormValues>;
   register: UseFormRegister<SignupFormValues>;
   getValues: UseFormGetValues<SignupFormValues>;
-  errors: FieldErrors<SignupFormValues>;
 };
 
 export default function SignupFields({
+  control,
   register,
   getValues,
-  errors,
 }: SignupFieldsProps) {
+  const { errors } = useFormState({
+    control,
+    name: ["email", "nickname"],
+    exact: true,
+  });
+
   return (
     <div className="flex flex-col gap-3">
       <AuthInputField
@@ -36,12 +43,9 @@ export default function SignupFields({
         })}
       />
       <SignupPasswordFields
+        control={control}
         register={register}
         getValues={getValues}
-        errors={{
-          password: errors.password,
-          confirmPassword: errors.confirmPassword,
-        }}
       />
       <AuthInputField
         type="text"

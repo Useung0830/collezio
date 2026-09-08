@@ -7,6 +7,7 @@ import SignupFields from "./SignupFields";
 
 export default function SignupForm() {
   const {
+    control,
     register,
     getValues,
     errors,
@@ -17,7 +18,11 @@ export default function SignupForm() {
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-      <SignupFields register={register} getValues={getValues} errors={errors} />
+      <SignupFields
+        control={control}
+        register={register}
+        getValues={getValues}
+      />
       <SignupAgreements register={register} />
       {errors.root?.server && (
         <p role="alert" className="text-body-14 text-red-500">
