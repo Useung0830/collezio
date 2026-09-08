@@ -18,7 +18,9 @@
     "firebase": "^12.18.0",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.87.0",
+    "react-toastify": "^11.1.0"
   },
   "devDependencies": {
     "@svgr/webpack": "^8.1.0",
