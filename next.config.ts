@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  ...(process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true" && {
+    distDir: ".next-e2e",
+    typescript: { tsconfigPath: "tsconfig.e2e.json" },
+  }),
 
   images: {
     remotePatterns: [

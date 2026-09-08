@@ -1,4 +1,8 @@
 .next
+.next-e2e
+playwright-report
+test-results
+.firebase
 node_modules
 out
 build
