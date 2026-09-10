@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "./fixtures";
 
-test("로그인 성공 시 홈으로 이동한다", async ({ page, request }) => {
+test("로그인 후 헤더가 바뀌고 새로고침해도 유지된다", async ({
+  page,
+  request,
+}) => {
   const email = `${randomUUID()}@example.com`;
   const password = "Test1234!";
 
@@ -12,12 +15,37 @@ test("로그인 성공 시 홈으로 이동한다", async ({ page, request }) =>
   );
   expect(account.ok()).toBeTruthy();
 
-  await page.goto("/login");
+  await page.goto("/");
+  const header = page.getByRole("banner");
+  await expect(
+    header.getByRole("link", { name: "회원가입", exact: true }),
+  ).toBeVisible();
+  await header.getByRole("link", { name: "로그인", exact: true }).click();
   await page.getByPlaceholder("이메일", { exact: true }).fill(email);
   await page.getByPlaceholder("비밀번호", { exact: true }).fill(password);
   await page.getByRole("button", { name: "로그인", exact: true }).click();
 
   await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  await expect(header.getByRole("link", { name: "마이페이지" })).toBeVisible();
+  await expect(
+    header.getByRole("link", { name: "로그인", exact: true }),
+  ).toHaveCount(0);
+
+  await page.reload();
+  await expect(header.getByRole("link", { name: "마이페이지" })).toBeVisible();
+  await expect(
+    header.getByRole("link", { name: "회원가입", exact: true }),
+  ).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await header.getByRole("button", { name: "메뉴 열기" }).click();
+  const mobileMenu = header.getByRole("complementary", { name: "전체 메뉴" });
+  await expect(
+    mobileMenu.getByRole("button", { name: "로그아웃", exact: true }),
+  ).toBeVisible();
+  await expect(
+    mobileMenu.getByRole("link", { name: "로그인", exact: true }),
+  ).toHaveCount(0);
 });
 
 test("빈 입력 오류를 각 인풋에 연결해 표시한다", async ({ page }) => {
