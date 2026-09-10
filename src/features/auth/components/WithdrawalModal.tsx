@@ -1,6 +1,8 @@
 "use client";
-
 import { useEffect, useState } from "react";
+
+import Button from "@/components/common/button/Button";
+import IconButton from "@/components/common/button/IconButton";
 
 import CheckIcon from "@/assets/icons/icon-check.svg";
 import CloseIcon from "@/assets/icons/icon-close.svg";
@@ -83,14 +85,13 @@ export default function WithdrawalModal({
           <h2 id="withdrawal-title" className="text-heading-20 text-black-900">
             회원 탈퇴
           </h2>
-          <button
-            type="button"
-            className="text-black-900 flex size-8 items-center justify-center rounded-full"
+          <IconButton
+            size="sm"
             aria-label="회원 탈퇴 창 닫기"
             onClick={onClose}
           >
             <CloseIcon className="size-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <p className="text-heading-24 text-black-900 mt-5">
@@ -136,13 +137,14 @@ export default function WithdrawalModal({
           </span>
         </div>
 
-        <button
-          type="button"
-          className="border-black-300 text-label-14 text-black-900 mt-6 flex w-full items-center justify-center rounded-2xl border px-4 py-3"
+        <Button
+          size="sm"
+          shape="rounded"
+          className="mt-6 w-full"
           onClick={onConfirm}
         >
           회원 탈퇴
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { notFound } from "next/navigation";
 
+import Button from "@/components/common/button/Button";
+import ToggleButton from "@/components/common/button/ToggleButton";
 import NewProductList from "@/features/products/components/NewProductList";
 import { getProductDetail } from "@/features/products/services/getProductDetail";
 
@@ -118,15 +120,18 @@ export default async function ProductDetailPage(
             <span>채팅 {product.metrics.chatCount}</span>
           </div>
           <div className="text-label-16 flex justify-between gap-4">
-            <button className="border-black-400 text-black-900 flex items-center gap-1 rounded-2xl border px-10 py-4">
-              <HeartOutlineIcon className="size-4.5" />
+            <ToggleButton isPressed={false} size="lg" shape="rounded">
+              <HeartOutlineIcon className="size-4.5" aria-hidden="true" />
               <span className="whitespace-nowrap">찜</span>
-            </button>
-            <button
-              className={`${transactionColor} flex w-full items-center justify-center gap-1 rounded-2xl px-10 py-4 whitespace-nowrap text-white`}
+            </ToggleButton>
+            <Button
+              variant={isSale ? "blue" : "green"}
+              size="lg"
+              shape="rounded"
+              className="min-w-0 flex-1 whitespace-nowrap"
             >
               {buttonLabel}
-            </button>
+            </Button>
           </div>
         </div>
       </article>

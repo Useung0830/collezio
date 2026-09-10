@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import LinkButton from "@/components/common/button/LinkButton";
 import ProductCard from "@/features/products/components/ProductCard";
 import { products } from "@/features/products/mocks/products";
 
@@ -24,13 +23,15 @@ export default function MatchingHistory() {
         >
           매칭 내역 <span className="text-black-600 ml-2">4</span>
         </h2>
-        <Link
+        <LinkButton
           href="/products/new"
-          className="bg-brand-green text-label-14 flex items-center gap-1 rounded-lg px-4 py-2 text-white"
+          variant="green"
+          size="compact"
+          shape="square"
         >
           <PlusIcon className="size-4" aria-hidden="true" />
           상품 등록
-        </Link>
+        </LinkButton>
       </div>
 
       <div className="mt-4 overflow-x-auto">

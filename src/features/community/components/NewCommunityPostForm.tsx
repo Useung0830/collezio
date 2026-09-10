@@ -1,7 +1,8 @@
 "use client";
-
 import { useRouter } from "next/navigation";
 
+import Button from "@/components/common/button/Button";
+import IconButton from "@/components/common/button/IconButton";
 import ImageUploader from "@/components/common/ImageUploader";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
@@ -21,9 +22,9 @@ export default function NewCommunityPostForm() {
   return (
     <section className="mx-auto w-full max-w-184 pb-12">
       <div className="flex items-center gap-2">
-        <button type="button" aria-label="글쓰기 닫기" onClick={handleClose}>
+        <IconButton size="sm" aria-label="글쓰기 닫기" onClick={handleClose}>
           <CloseIcon className="size-5" aria-hidden="true" />
-        </button>
+        </IconButton>
         <h1 className="text-heading-24 text-black-900">글쓰기</h1>
       </div>
 
@@ -49,12 +50,9 @@ export default function NewCommunityPostForm() {
 
         <div className="mt-6">
           <ImageUploader maxImageCount={10} triggerVariant="text" />
-          <button
-            type="submit"
-            className="border-black-300 text-label-16 text-black-900 mt-5 flex h-13 w-full items-center justify-center rounded-2xl border"
-          >
+          <Button type="submit" shape="rounded" className="mt-5 h-13 w-full">
             작성 완료
-          </button>
+          </Button>
         </div>
       </form>
     </section>

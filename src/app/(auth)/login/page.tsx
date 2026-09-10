@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import Button from "@/components/common/button/Button";
+
 import EmailIcon from "@/assets/icons/icon-email.svg";
 import VisibilityIcon from "@/assets/icons/icon-eye-thin.svg";
 import GooleLogoIcon from "@/assets/icons/icon-google-logo.svg";
@@ -37,9 +39,9 @@ export default function LoginPage() {
               <VisibilityIcon className="size-6" />
             </div>
           </div>
-          <button className="bg-brand-green w-full rounded-lg py-3 text-white">
+          <Button variant="green" shape="square" className="w-full">
             로그인
-          </button>
+          </Button>
         </div>
         <div className="text-body-14 flex items-center justify-center gap-3">
           <div className="flex items-center justify-center gap-2">
@@ -61,14 +63,14 @@ export default function LoginPage() {
           <div className="border-black-200 w-full border-t" />
         </div>
         <div className="flex flex-col gap-2">
-          <div className="border-black-200 relative flex items-center justify-center rounded-lg border px-3 py-3">
+          <Button shape="square" className="relative">
             <KakaoLogoIcon className="absolute left-5 size-4" />
             <span className="text-body-16 text-black-900">카카오로 계속</span>
-          </div>
-          <div className="border-black-200 relative flex items-center justify-center rounded-lg border px-3 py-3">
+          </Button>
+          <Button shape="square" className="relative">
             <GooleLogoIcon className="absolute left-5 size-4" />
             <span className="text-body-16 text-black-900">Google로 계속</span>
-          </div>
+          </Button>
         </div>
       </div>
     </main>

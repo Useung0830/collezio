@@ -1,14 +1,15 @@
 "use client";
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import Button from "@/components/common/button/Button";
+import IconButton from "@/components/common/button/IconButton";
+import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
+import RadioOption from "@/components/common/radio-group/RadioOption";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 import RightIcon from "@/assets/icons/icon-right.svg";
-
-import SelectionButton from "./SelectionButton";
 
 type TransactionType = "exchange" | "sale";
 type DeliveryType = "direct" | "parcel";
@@ -26,19 +27,24 @@ export default function NewProductForm() {
     router.back();
   };
 
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    // 상품 등록 API 연결 전에는 기본 GET 제출로 입력값이 URL에 노출되지 않게 합니다.
+    event.preventDefault();
+  };
+
   const isExchange = transactionType === "exchange";
   const isDirect = deliveryType === "direct";
 
   return (
     <section className="mx-auto w-full max-w-184 pb-20">
       <div className="mb-7 flex items-center gap-2">
-        <button type="button" aria-label="상품 등록 닫기" onClick={handleClose}>
+        <IconButton size="sm" aria-label="상품 등록 닫기" onClick={handleClose}>
           <CloseIcon className="size-6" aria-hidden="true" />
-        </button>
+        </IconButton>
         <h1 className="text-heading-24 text-black-900">상품 등록</h1>
       </div>
 
-      <form className="flex flex-col gap-7">
+      <form className="flex flex-col gap-7" onSubmit={handleSubmit}>
         <ImageUploader maxImageCount={10} showRepresentativeLabel />
 
         <label className="text-label-16 text-black-900 flex flex-col gap-3">
@@ -67,18 +73,22 @@ export default function NewProductForm() {
             거래 방법
           </legend>
           <div className="flex gap-2">
-            <SelectionButton
-              isSelected={isExchange}
-              onClick={() => setTransactionType("exchange")}
+            <RadioOption
+              name="transactionType"
+              value="exchange"
+              checked={isExchange}
+              onChange={() => setTransactionType("exchange")}
             >
               교환하기
-            </SelectionButton>
-            <SelectionButton
-              isSelected={!isExchange}
-              onClick={() => setTransactionType("sale")}
+            </RadioOption>
+            <RadioOption
+              name="transactionType"
+              value="sale"
+              checked={!isExchange}
+              onChange={() => setTransactionType("sale")}
             >
               판매하기
-            </SelectionButton>
+            </RadioOption>
           </div>
           <input
             name={isExchange ? "desiredItem" : "price"}
@@ -99,25 +109,28 @@ export default function NewProductForm() {
             거래 방식
           </legend>
           <div className="flex gap-2">
-            <SelectionButton
-              isSelected={isDirect}
-              onClick={() => setDeliveryType("direct")}
+            <RadioOption
+              name="deliveryType"
+              value="direct"
+              checked={isDirect}
+              onChange={() => setDeliveryType("direct")}
             >
               직거래
-            </SelectionButton>
-            <SelectionButton
-              isSelected={!isDirect}
-              onClick={() => setDeliveryType("parcel")}
+            </RadioOption>
+            <RadioOption
+              name="deliveryType"
+              value="parcel"
+              checked={!isDirect}
+              onChange={() => setDeliveryType("parcel")}
             >
               택배 거래
-            </SelectionButton>
+            </RadioOption>
           </div>
           {isDirect ? (
-            <button
-              type="button"
-              className="border-black-300 text-body-16 text-black-900 mt-3 flex h-13 items-center justify-between rounded-2xl border px-5"
-            >
-              <span>거래 희망 장소</span>
+            <Button shape="rounded" className="mt-3 h-13">
+              <span className="text-body-16 flex-1 text-left">
+                거래 희망 장소
+              </span>
               <span className="text-black-400 flex items-center gap-2">
                 위치 추가
                 <RightIcon
@@ -125,7 +138,7 @@ export default function NewProductForm() {
                   aria-hidden="true"
                 />
               </span>
-            </button>
+            </Button>
           ) : (
             <div className="mt-3 flex gap-2">
               <label className="border-black-300 focus-within:border-black-900 flex h-13 min-w-0 flex-1 items-center rounded-2xl border px-5">
@@ -148,28 +161,21 @@ export default function NewProductForm() {
                   <span className="text-body-16 text-black-600">원</span>
                 )}
               </label>
-              <button
-                type="button"
-                className={`text-label-14 shrink-0 rounded-2xl border px-4 ${
-                  isFreeShipping
-                    ? "border-black-900 bg-black-900 text-white"
-                    : "border-black-200 text-black-600 bg-white"
-                }`}
-                aria-pressed={isFreeShipping}
+              <ToggleButton
+                size="compact"
+                shape="rounded"
+                isPressed={isFreeShipping}
                 onClick={() => setIsFreeShipping((isFree) => !isFree)}
               >
                 무료 배송
-              </button>
+              </ToggleButton>
             </div>
           )}
         </fieldset>
 
-        <button
-          type="button"
-          className="border-black-300 text-label-16 text-black-900 h-13 rounded-2xl border"
-        >
+        <Button type="submit" shape="rounded" className="h-13">
           {isExchange ? "교환하기" : "판매하기"}
-        </button>
+        </Button>
       </form>
     </section>
   );

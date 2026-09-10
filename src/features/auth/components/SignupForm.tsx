@@ -1,5 +1,6 @@
 "use client";
 
+import Button from "@/components/common/button/Button";
 import { useSignupForm } from "@/features/auth/hooks/useSignupForm";
 
 import SignupAgreements from "./SignupAgreements";
@@ -29,13 +30,16 @@ export default function SignupForm() {
           {errors.root.server.message}
         </p>
       )}
-      <button
+      <Button
         type="submit"
-        disabled={!isFormReady || isSubmitting}
-        className="text-body-16 bg-brand-green disabled:bg-black-400 w-full rounded-lg py-3 text-white"
+        variant="green"
+        shape="square"
+        disabled={!isFormReady}
+        isLoading={isSubmitting}
+        className="disabled:bg-black-400 w-full"
       >
         {isSubmitting ? "가입 중..." : "회원가입"}
-      </button>
+      </Button>
     </form>
   );
 }
