@@ -1,4 +1,10 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { onAuthStateChanged } from "firebase/auth";
+
+import { firebaseAuth } from "@/lib/firebase";
 
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
@@ -6,11 +12,15 @@ import HeaderAuthActions from "./HeaderAuthActions";
 import HeaderMobileActions from "./HeaderMobileActions";
 import HeaderSearchBar from "./HeaderSearchBar";
 
-type HeaderProps = {
-  isLoggedIn?: boolean;
-};
+export default function Header() {
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
-export default function Header({ isLoggedIn = false }: HeaderProps) {
+  useEffect(() => {
+    return onAuthStateChanged(firebaseAuth, (user) => {
+      setIsLoggedIn(user !== null);
+    });
+  }, []);
+
   return (
     <header className="flex w-full items-center justify-center px-4 py-3 max-lg:px-3">
       <div className="flex w-full max-w-280 items-center justify-between gap-5">
@@ -30,10 +40,12 @@ export default function Header({ isLoggedIn = false }: HeaderProps) {
           </Link>
         </ul>
         <div className="shrink-0 max-lg:hidden">
-          <HeaderAuthActions isLoggedIn={isLoggedIn} />
+          {isLoggedIn !== null && <HeaderAuthActions isLoggedIn={isLoggedIn} />}
         </div>
         <div className="ml-auto min-w-0 flex-1 lg:hidden">
-          <HeaderMobileActions isLoggedIn={isLoggedIn} />
+          {isLoggedIn !== null && (
+            <HeaderMobileActions isLoggedIn={isLoggedIn} />
+          )}
         </div>
       </div>
     </header>
