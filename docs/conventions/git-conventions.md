@@ -82,6 +82,9 @@ Issue와 GitHub Projects는 필수가 아니다. 다음과 같이 작업 범위�
 PR을 사용한다면 기능 작업의 대상은 `dev`, 배포의 대상은 `main`으로 한다.
 Issue가 있다면 PR 본문에 `Closes #12`처럼 연결할 수 있다.
 
+PR 제목·본문 작성은 [PR 작성 컨벤션](pr-conventions.md)을 따르며,
+[기본 템플릿](../../.github/pull_request_template.md)의 안내에 맞춰 작성한다.
+
 ## 커밋 기준
 
 커밋은 해당 커밋만 되돌렸을 때 하나의 독립적인 변경이 취소되는 단위로 나눈다.
