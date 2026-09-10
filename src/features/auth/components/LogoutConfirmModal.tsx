@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import Button from "@/components/common/button/Button";
+
 type LogoutConfirmModalProps = {
   isOpen: boolean;
   onCancel: () => void;
@@ -56,21 +58,12 @@ export default function LogoutConfirmModal({
           로그아웃 하시겠습니까?
         </h2>
         <div className="mt-6 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            autoFocus
-            className="border-black-300 text-label-14 text-black-900 flex items-center justify-center rounded-full border px-4 py-2.5"
-            onClick={onCancel}
-          >
+          <Button size="sm" autoFocus onClick={onCancel}>
             취소
-          </button>
-          <button
-            type="button"
-            className="bg-black-900 text-label-14 flex items-center justify-center rounded-full px-4 py-2.5 text-white"
-            onClick={onConfirm}
-          >
+          </Button>
+          <Button size="sm" variant="primary" onClick={onConfirm}>
             로그아웃
-          </button>
+          </Button>
         </div>
       </div>
     </div>

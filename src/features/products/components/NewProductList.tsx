@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import Button from "@/components/common/button/Button";
 import ProductCard from "@/features/products/components/ProductCard";
 import { newProducts } from "@/features/products/mocks/products";
 
@@ -37,15 +38,16 @@ export default function NewProductList() {
       </ul>
 
       {hasMoreProducts && (
-        <button
-          type="button"
-          className="border-black-300 text-label-16 text-black-900 hover:bg-black-50 mx-auto mt-10 flex w-full max-w-80 cursor-pointer items-center justify-center rounded-full border py-3 transition-colors md:mt-12"
-          aria-controls="new-product-list"
-          aria-expanded={!hasMoreProducts}
-          onClick={handleLoadMore}
-        >
-          더보기
-        </button>
+        <div className="mt-10 flex justify-center md:mt-12">
+          <Button
+            className="w-full max-w-80"
+            aria-controls="new-product-list"
+            aria-expanded={!hasMoreProducts}
+            onClick={handleLoadMore}
+          >
+            더보기
+          </Button>
+        </div>
       )}
     </section>
   );

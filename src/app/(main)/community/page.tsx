@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import LinkButton from "@/components/common/button/LinkButton";
 import CommunityListBackButton from "@/features/community/components/CommunityListBackButton";
 import CommunityPostList from "@/features/community/components/CommunityPostList";
 
@@ -15,12 +14,13 @@ export default function CommunityPage() {
         <CommunityPostList />
       </div>
 
-      <Link
+      <LinkButton
+        variant="green"
         href="/community/new"
-        className="bg-brand-green text-label-14 fixed right-4 bottom-8 z-40 flex items-center justify-center rounded-full px-5 py-3 text-white shadow-lg sm:right-8 lg:right-[max(2rem,calc((100vw-46rem)/2))]"
+        className="fixed right-4 bottom-8 z-40 shadow-lg sm:right-8 lg:right-[max(2rem,calc((100vw-46rem)/2))]"
       >
         글쓰기
-      </Link>
+      </LinkButton>
     </section>
   );
 }

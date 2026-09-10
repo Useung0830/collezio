@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import Button from "@/components/common/button/Button";
+
 import EmailIcon from "@/assets/icons/icon-email.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
@@ -29,9 +31,14 @@ export default function FindPasswordPage() {
                 className="text-body-16 text-black-900 w-full outline-none"
               />
             </div>
-            <button className="bg-brand-green w-full rounded-lg py-3 text-white">
+            <Button
+              type="submit"
+              variant="green"
+              shape="square"
+              className="w-full"
+            >
               재설정 링크 받기
-            </button>
+            </Button>
           </form>
         </div>
         <div className="text-body-14 flex items-center justify-center gap-2">

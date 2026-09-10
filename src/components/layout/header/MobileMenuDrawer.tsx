@@ -1,9 +1,11 @@
 "use client";
-
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
+import Button from "@/components/common/button/Button";
+import IconButton from "@/components/common/button/IconButton";
+import LinkButton from "@/components/common/button/LinkButton";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
 
@@ -110,25 +112,29 @@ export default function MobileMenuDrawer({
             </Link>
           ) : (
             <div className="flex items-center gap-2">
-              <Link
+              <LinkButton
                 href="/login"
-                className="border-black-200 text-caption-12-bold text-black-900 rounded-lg border px-3 py-1.5"
+                size="xs"
+                shape="square"
+                variant="outline"
                 onClick={onClose}
               >
                 로그인
-              </Link>
-              <Link
+              </LinkButton>
+              <LinkButton
                 href="/signup"
-                className="bg-brand-blue text-caption-12-bold rounded-lg px-3 py-1.5 text-white"
+                size="xs"
+                shape="square"
+                variant="blue"
                 onClick={onClose}
               >
                 회원가입
-              </Link>
+              </LinkButton>
             </div>
           )}
-          <button aria-label="메뉴 닫기" onClick={onClose}>
+          <IconButton size="sm" aria-label="메뉴 닫기" onClick={onClose}>
             <CloseIcon className="text-black-900 size-5" aria-hidden="true" />
-          </button>
+          </IconButton>
         </div>
 
         <nav className="text-body-16 text-black-900 flex flex-col gap-5 px-6 pt-5">
@@ -156,12 +162,22 @@ export default function MobileMenuDrawer({
 
           {isLoggedIn && (
             <div className="text-black-600 flex flex-col gap-5">
-              <button className="text-left" onClick={handleOpenLogoutModal}>
+              <Button
+                variant="muted"
+                size="text"
+                className="self-start"
+                onClick={handleOpenLogoutModal}
+              >
                 로그아웃
-              </button>
-              <button className="text-left" onClick={handleOpenWithdrawalModal}>
+              </Button>
+              <Button
+                variant="muted"
+                size="text"
+                className="self-start"
+                onClick={handleOpenWithdrawalModal}
+              >
                 탈퇴하기
-              </button>
+              </Button>
             </div>
           )}
         </nav>

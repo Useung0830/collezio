@@ -1,9 +1,9 @@
 "use client";
-
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import Button from "@/components/common/button/Button";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
 
@@ -79,22 +79,22 @@ export default function MySidebar() {
               </li>
             ))}
             <li>
-              <button
-                type="button"
-                className="text-black-600"
+              <Button
+                variant="muted"
+                size="text"
                 onClick={handleOpenLogoutModal}
               >
                 로그아웃
-              </button>
+              </Button>
             </li>
             <li>
-              <button
-                type="button"
-                className="text-black-600"
+              <Button
+                variant="muted"
+                size="text"
                 onClick={handleOpenWithdrawalModal}
               >
                 탈퇴하기
-              </button>
+              </Button>
             </li>
           </ul>
         </div>

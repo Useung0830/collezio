@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import Button from "@/components/common/button/Button";
+
 import EditIcon from "@/assets/icons/icon-edit.svg";
 import profileImage from "@/assets/images/profile.png";
 
@@ -24,10 +26,10 @@ export default function ProfileSummary() {
           </p>
         </div>
       </div>
-      <button className="border-black-200 text-label-14 inline-flex shrink-0 items-center justify-center gap-1 rounded-full border px-5 py-2">
+      <Button size="compact" aria-haspopup="dialog">
         <EditIcon className="size-4" aria-hidden="true" />
         <span>프로필 수정</span>
-      </button>
+      </Button>
     </section>
   );
 }

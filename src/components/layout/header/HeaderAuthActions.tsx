@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import LinkButton from "@/components/common/button/LinkButton";
+
 import BellIcon from "@/assets/icons/icon-bell-outline.svg";
 import ProfileIcon from "@/assets/icons/icon-profile.svg";
 
@@ -13,18 +15,24 @@ export default function HeaderAuthActions({
   if (!isLoggedIn) {
     return (
       <nav aria-label="회원 메뉴" className="flex items-center gap-3">
-        <Link
+        <LinkButton
           href="/login"
-          className="border-black-200 text-label-14 text-black-900 rounded-lg border px-4 py-2 whitespace-nowrap"
+          size="compact"
+          shape="square"
+          variant="outline"
+          className="whitespace-nowrap"
         >
           로그인
-        </Link>
-        <Link
+        </LinkButton>
+        <LinkButton
           href="/signup"
-          className="bg-brand-blue text-label-14 rounded-lg px-4 py-2 whitespace-nowrap text-white"
+          size="compact"
+          shape="square"
+          variant="blue"
+          className="whitespace-nowrap"
         >
           회원가입
-        </Link>
+        </LinkButton>
       </nav>
     );
   }
