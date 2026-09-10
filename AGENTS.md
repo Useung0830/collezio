@@ -48,6 +48,7 @@ Read these documents according to the work being performed:
 - Branches, commits, pull requests, or releases:
   - `docs/conventions/git-conventions.md`
   - `docs/conventions/merge-strategy.md`
+  - `docs/conventions/pr-conventions.md` when pushing work branches or creating or editing pull requests or PR templates
 
 If a task spans multiple categories, read all corresponding documents.
 
@@ -83,3 +84,16 @@ routing, rendering boundaries, configuration, or production behavior.
 - Do not commit secrets or `.env` files.
 - Remove debugging code such as `console.log`.
 - Summarize changed files and validation results when completing work.
+
+## After Pushing a Work Branch
+
+- After successfully pushing a work branch, always provide a ready-to-copy PR
+  title and body in the final response, without waiting for a separate request.
+- Read `docs/conventions/pr-conventions.md` and
+  `.github/pull_request_template.md`, inspect the full diff against the intended
+  base branch, and fill in the actual changes, validation results, and limitations.
+- Include the source and target branches and a PR creation link when available.
+- Describe the complete PR scope, not only the most recent commit. Distinguish
+  observed local validation from GitHub Actions results that have not been checked.
+- Providing PR text does not itself create or update a PR. State clearly whether
+  the PR was actually created or only its title and body were prepared.

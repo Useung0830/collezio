@@ -1,12 +1,10 @@
 import Link from "next/link";
 
 import Button from "@/components/common/button/Button";
+import LoginForm from "@/components/LoginForm";
 
-import EmailIcon from "@/assets/icons/icon-email.svg";
-import VisibilityIcon from "@/assets/icons/icon-eye-thin.svg";
 import GooleLogoIcon from "@/assets/icons/icon-google-logo.svg";
 import KakaoLogoIcon from "@/assets/icons/icon-kakao-logo.svg";
-import PasswordIcon from "@/assets/icons/icon-lock.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
 export default function LoginPage() {
@@ -19,30 +17,7 @@ export default function LoginPage() {
         />
       </Link>
       <div className="border-black-200 flex w-full max-w-137 flex-col justify-center gap-4 rounded-2xl p-3 pt-0 lg:px-17.75">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <div className="border-black-200 flex items-center gap-2 rounded-lg border p-4">
-              <EmailIcon className="size-6" />
-              <input
-                type="email"
-                placeholder="이메일"
-                className="text-body-16 text-black-900 w-full outline-none"
-              />
-            </div>
-            <div className="border-black-200 flex items-center gap-2 rounded-lg border p-4">
-              <PasswordIcon className="size-6" />
-              <input
-                type="password"
-                placeholder="비밀번호"
-                className="text-body-16 w-full outline-none"
-              />
-              <VisibilityIcon className="size-6" />
-            </div>
-          </div>
-          <Button variant="green" shape="square" className="w-full">
-            로그인
-          </Button>
-        </div>
+        <LoginForm />
         <div className="text-body-14 flex items-center justify-center gap-3">
           <div className="flex items-center justify-center gap-2">
             <p className="text-black-700">계정이 없으신가요?</p>
