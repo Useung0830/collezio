@@ -27,6 +27,31 @@ git push origin dev
 
 PR을 사용하는 경우 GitHub의 Squash and merge로 같은 결과를 만들 수 있다.
 
+## PR 자동 병합
+
+`.github/workflows/auto-merge.yml`은 같은 저장소에서 생성한 `dev` 대상 PR의
+자동 병합을 활성화한다. 필수 검사와 리뷰 등 브랜치 규칙을 모두 충족하면
+Squash Merge로 병합된다. 충돌은 직접 해결해야 한다.
+
+- Draft PR은 준비 완료로 전환한 뒤 자동 병합을 활성화한다.
+- PR을 Draft로 전환하거나 대상을 `main`으로 바꾸면 자동 병합을 해제한다.
+- 외부 fork PR은 자동화 대상에서 제외한다.
+- `main` 대상 PR은 직접 확인한 뒤 Merge Commit으로 병합한다.
+
+저장소의 **Allow auto-merge**와 **Allow squash merging**이 켜져 있어야 한다.
+`dev` 규칙에는 `Check and Build`, `Signup E2E`를 필수 검사로 등록한다.
+`Configure Auto Merge`는 필수 검사로 지정하지 않는다.
+
+이 워크플로우는 `pull_request_target`을 사용하므로 저장소 기본 브랜치에 먼저
+반영해야 한다. 최초 도입 PR은 직접 병합하거나 자동 병합 버튼을 눌러 처리한다.
+반영 이후 새 PR 생성, 커밋 추가, PR 재열기, 준비 상태 또는 대상 변경 시 실행된다.
+PR 코드를 체크아웃하거나 실행하는 단계를 이 워크플로우에 추가하지 않는다.
+
+기본 `GITHUB_TOKEN`을 사용하며 별도 PAT는 필요하지 않다. 이 토큰으로 발생한
+병합의 `push` 이벤트는 다른 Actions 실행을 유발하지 않으므로 PR의 필수 검사를
+병합 기준으로 삼는다. 향후 병합 후 배포 워크플로우를 추가할 때는 실행 방식을
+별도로 구성한다.
+
 ## dev에서 main으로 병합
 
 배포할 시점에는 `dev`를 `main`에 Merge Commit으로 병합한다. 기능 단위 커밋을
