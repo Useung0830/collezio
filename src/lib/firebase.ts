@@ -2,6 +2,8 @@ import "client-only";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,6 +19,8 @@ export const firebaseApp = getApps().length
   : initializeApp(firebaseConfig);
 
 export const firebaseAuth = getAuth(firebaseApp);
+export const firebaseDb = getFirestore(firebaseApp);
+export const firebaseStorage = getStorage(firebaseApp);
 
 if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   if (firebaseApp.options.projectId !== "demo-collezio") {

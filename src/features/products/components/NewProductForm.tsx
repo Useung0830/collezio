@@ -22,6 +22,7 @@ export default function NewProductForm() {
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("direct");
   const [shippingFee, setShippingFee] = useState("");
   const [isFreeShipping, setIsFreeShipping] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
 
   const handleClose = () => {
     router.back();
@@ -45,7 +46,11 @@ export default function NewProductForm() {
       </div>
 
       <form className="flex flex-col gap-7" onSubmit={handleSubmit}>
-        <ImageUploader maxImageCount={10} showRepresentativeLabel />
+        <ImageUploader
+          maxImageCount={10}
+          showRepresentativeLabel
+          onFilesChange={setFiles}
+        />
 
         <label className="text-label-16 text-black-900 flex flex-col gap-3">
           제목
@@ -173,7 +178,12 @@ export default function NewProductForm() {
           )}
         </fieldset>
 
-        <Button type="submit" shape="rounded" className="h-13">
+        <Button
+          type="submit"
+          shape="rounded"
+          className="h-13"
+          disabled={files.length === 0}
+        >
           {isExchange ? "교환하기" : "판매하기"}
         </Button>
       </form>

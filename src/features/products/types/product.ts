@@ -12,6 +12,23 @@ interface ExchangeTransaction {
 
 export type ProductTransaction = SaleTransaction | ExchangeTransaction;
 
+export type ProductDelivery =
+  | { type: "direct"; location: string }
+  | { type: "parcel"; shippingFee: number };
+
+export interface ProductImage {
+  url: string;
+  path: string;
+}
+
+export interface CreateProductInput {
+  title: string;
+  description: string;
+  transaction: ProductTransaction;
+  delivery: ProductDelivery;
+  images: ProductImage[];
+}
+
 export interface ProductSeller {
   id: number;
   nickname: string;
