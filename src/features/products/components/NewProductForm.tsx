@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { toast } from "react-toastify/unstyled";
 import { useRouter } from "next/navigation";
 
 import Button from "@/components/common/button/Button";
@@ -7,6 +8,11 @@ import IconButton from "@/components/common/button/IconButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
+import { useRegisterProductMutation } from "@/features/products/hooks/useRegisterProductMutation";
+import type {
+  ProductDelivery,
+  ProductTransaction,
+} from "@/features/products/types/product";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 
@@ -17,6 +23,8 @@ type DeliveryType = "direct" | "parcel";
 
 export default function NewProductForm() {
   const router = useRouter();
+
+  const registerProductMutation = useRegisterProductMutation();
 
   const [transactionType, setTransactionType] =
     useState<TransactionType>("exchange");
@@ -33,9 +41,89 @@ export default function NewProductForm() {
     router.back();
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    // 상품 등록 API 연결 전에는 기본 GET 제출로 입력값이 URL에 노출되지 않게 합니다.
+  const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (
+      registerProductMutation.isPending ||
+      registerProductMutation.isSuccess
+    ) {
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const title = String(formData.get("title") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+
+    if (!title || !description) {
+      toast.error("제목과 자세한 설명을 입력해주세요.");
+      return;
+    }
+
+    let transaction: ProductTransaction;
+
+    if (transactionType === "exchange") {
+      const desiredItemName = String(formData.get("desiredItem") ?? "").trim();
+
+      if (!desiredItemName) {
+        toast.error("교환을 희망하는 상품명을 입력해주세요.");
+        return;
+      }
+
+      transaction = { type: "exchange", desiredItemName };
+    } else {
+      const priceText = String(formData.get("price") ?? "").trim();
+      const price = Number(priceText);
+
+      if (!priceText || !Number.isSafeInteger(price) || price < 0) {
+        toast.error("판매 가격은 0 이상의 정수로 입력해주세요.");
+        return;
+      }
+
+      transaction = { type: "sale", price };
+    }
+
+    let delivery: ProductDelivery;
+
+    if (deliveryType === "direct") {
+      const location = [tradeLocation.address, tradeLocation.detail.trim()]
+        .filter(Boolean)
+        .join(" ");
+
+      if (!tradeLocation.address || location.length > 200) {
+        toast.error("거래 장소를 선택하고 200자 이내로 입력해주세요.");
+        return;
+      }
+
+      delivery = { type: "direct", location };
+    } else {
+      const fee = isFreeShipping ? 0 : Number(shippingFee);
+
+      if (
+        (!isFreeShipping && !shippingFee.trim()) ||
+        !Number.isSafeInteger(fee) ||
+        fee < 0
+      ) {
+        toast.error("택배비는 0 이상의 정수로 입력해주세요.");
+        return;
+      }
+
+      delivery = { type: "parcel", shippingFee: fee };
+    }
+
+    registerProductMutation.mutate(
+      { title, description, transaction, delivery, files },
+      {
+        onSuccess: () => {
+          toast.success("상품이 등록되었습니다.");
+        },
+        onError: () => {
+          toast.error(
+            "상품 등록에 실패했습니다. 입력값과 연결 상태를 확인해주세요.",
+          );
+        },
+      },
+    );
   };
 
   const isExchange = transactionType === "exchange";
@@ -179,9 +267,20 @@ export default function NewProductForm() {
           type="submit"
           shape="rounded"
           className="h-13"
-          disabled={files.length === 0 || (isDirect && !tradeLocation.address)}
+          disabled={
+            registerProductMutation.isPending ||
+            registerProductMutation.isSuccess ||
+            files.length === 0 ||
+            (isDirect && !tradeLocation.address)
+          }
         >
-          {isExchange ? "교환하기" : "판매하기"}
+          {registerProductMutation.isPending
+            ? "등록 중..."
+            : registerProductMutation.isSuccess
+              ? "등록 완료"
+              : isExchange
+                ? "교환하기"
+                : "판매하기"}
         </Button>
       </form>
     </section>
