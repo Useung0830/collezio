@@ -10,18 +10,21 @@ type ImageUploaderProps = {
   maxImageCount?: number;
   showRepresentativeLabel?: boolean;
   triggerVariant?: "text" | "tile";
+  onFilesChange?: (files: File[]) => void;
 };
 
 type UploadedImage = {
   id: string;
   name: string;
   url: string;
+  file: File;
 };
 
 export default function ImageUploader({
   maxImageCount = 10,
   showRepresentativeLabel = false,
   triggerVariant = "tile",
+  onFilesChange,
 }: ImageUploaderProps) {
   const [images, setImages] = useState<UploadedImage[]>([]);
   const imageUrls = useRef(new Set<string>());
@@ -37,6 +40,7 @@ export default function ImageUploader({
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
     const availableCount = maxImageCount - images.length;
+
     const newImages = selectedFiles.slice(0, availableCount).map((file) => {
       const url = URL.createObjectURL(file);
       imageUrls.current.add(url);
@@ -45,24 +49,30 @@ export default function ImageUploader({
         id: `${file.name}-${file.lastModified}-${url}`,
         name: file.name,
         url,
+        file,
       };
     });
 
-    setImages((currentImages) => [...currentImages, ...newImages]);
+    const nextImages = [...images, ...newImages];
+
+    setImages(nextImages);
+    onFilesChange?.(nextImages.map((image) => image.file));
+
     event.target.value = "";
   };
 
   const handleImageRemove = (imageId: string) => {
-    setImages((currentImages) => {
-      const removedImage = currentImages.find((image) => image.id === imageId);
+    const removedImage = images.find((image) => image.id === imageId);
 
-      if (removedImage) {
-        URL.revokeObjectURL(removedImage.url);
-        imageUrls.current.delete(removedImage.url);
-      }
+    if (removedImage) {
+      URL.revokeObjectURL(removedImage.url);
+      imageUrls.current.delete(removedImage.url);
+    }
 
-      return currentImages.filter((image) => image.id !== imageId);
-    });
+    const nextImages = images.filter((image) => image.id !== imageId);
+
+    setImages(nextImages);
+    onFilesChange?.(nextImages.map((image) => image.file));
   };
 
   const isTextTrigger = triggerVariant === "text";
