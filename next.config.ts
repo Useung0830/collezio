@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
   ...(process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true" && {
@@ -9,6 +11,16 @@ const nextConfig: NextConfig = {
 
   images: {
     remotePatterns: [
+      ...(storageBucket
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: "firebasestorage.googleapis.com",
+              port: "",
+              pathname: `/v0/b/${storageBucket}/o/**`,
+            },
+          ]
+        : []),
       {
         protocol: "https",
         hostname: "i.pravatar.cc",
