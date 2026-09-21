@@ -9,7 +9,8 @@ import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
-import RightIcon from "@/assets/icons/icon-right.svg";
+
+import TradeLocationField from "./TradeLocationField";
 
 type TransactionType = "exchange" | "sale";
 type DeliveryType = "direct" | "parcel";
@@ -23,6 +24,10 @@ export default function NewProductForm() {
   const [shippingFee, setShippingFee] = useState("");
   const [isFreeShipping, setIsFreeShipping] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [tradeLocation, setTradeLocation] = useState({
+    address: "",
+    detail: "",
+  });
 
   const handleClose = () => {
     router.back();
@@ -132,18 +137,10 @@ export default function NewProductForm() {
             </RadioOption>
           </div>
           {isDirect ? (
-            <Button shape="rounded" className="mt-3 h-13">
-              <span className="text-body-16 flex-1 text-left">
-                거래 희망 장소
-              </span>
-              <span className="text-black-400 flex items-center gap-2">
-                위치 추가
-                <RightIcon
-                  className="text-black-900 size-5"
-                  aria-hidden="true"
-                />
-              </span>
-            </Button>
+            <TradeLocationField
+              value={tradeLocation}
+              onChange={setTradeLocation}
+            />
           ) : (
             <div className="mt-3 flex gap-2">
               <label className="border-black-300 focus-within:border-black-900 flex h-13 min-w-0 flex-1 items-center rounded-2xl border px-5">
@@ -182,7 +179,7 @@ export default function NewProductForm() {
           type="submit"
           shape="rounded"
           className="h-13"
-          disabled={files.length === 0}
+          disabled={files.length === 0 || (isDirect && !tradeLocation.address)}
         >
           {isExchange ? "교환하기" : "판매하기"}
         </Button>
