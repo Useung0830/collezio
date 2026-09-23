@@ -4,7 +4,7 @@ import { readOllamaStream } from "./readOllamaStream.mjs";
 const MAX_INPUT_BYTES = 80_000;
 const MAX_CHANGED_FILES = 30;
 const CONTEXT_TOKENS = 32_768;
-const OUTPUT_TOKENS = 4096;
+const OUTPUT_TOKENS = 2048;
 
 export const reviewSchema = {
   type: "object",
@@ -129,7 +129,7 @@ Output schema: ${JSON.stringify(schema)}`,
       messages,
       format: schema,
       stream: true,
-      think: true,
+      think: false,
       keep_alive: "5m",
       options: {
         temperature: 0,
@@ -137,19 +137,23 @@ Output schema: ${JSON.stringify(schema)}`,
         num_predict: OUTPUT_TOKENS,
       },
     }),
-    signal: AbortSignal.timeout(15 * 60_000),
+    signal: AbortSignal.timeout(10 * 60_000),
     redirect: "error",
   });
   if (!response.ok) throw new Error(`Ollama 요청 실패: ${response.status}`);
   const result = await readOllamaStream(response);
-  if (
-    result.error ||
-    result.done !== true ||
-    result.done_reason === "length" ||
-    result.prompt_eval_count >= CONTEXT_TOKENS - OUTPUT_TOKENS ||
-    !result.message?.content
-  ) {
-    throw new Error("모델 응답이 실패했거나 문맥·출력 한도를 초과했습니다.");
-  }
+  const usage = `입력 ${result.prompt_eval_count ?? "알 수 없음"}토큰, 생성 ${result.eval_count ?? "알 수 없음"}토큰`;
+  if (result.done_reason === "length")
+    throw new Error(
+      `생성 한도 ${OUTPUT_TOKENS}토큰에 도달해 리뷰가 잘렸습니다 (${usage}): ${file.filename}`,
+    );
+  if (result.prompt_eval_count >= CONTEXT_TOKENS - OUTPUT_TOKENS)
+    throw new Error(
+      `출력 여유를 포함한 문맥 한도를 초과했습니다 (${usage}): ${file.filename}`,
+    );
+  if (result.error || result.done !== true || !result.message?.content)
+    throw new Error(
+      `모델이 최종 리뷰를 완료하지 못했습니다 (${usage}, 종료 사유 ${result.done_reason ?? "없음"}): ${file.filename}`,
+    );
   return result.message.content;
 }

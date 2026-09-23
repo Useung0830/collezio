@@ -207,12 +207,12 @@ test("스트림 중단·오류·잘못된 JSON·완료 이후 데이터는 거�
     await assert.rejects(readOllamaStream(new Response(wire)));
 });
 
-test("추론과 관련 코드를 포함한 스트리밍 응답을 리뷰 함수가 처리한다", async () => {
+test("추론 없이 관련 코드를 포함한 스트리밍 응답을 리뷰 함수가 처리한다", async () => {
   const relatedSources = [
     { path: "src/helper.ts", source: "export const x = 1;" },
   ];
   const raw = await reviewWithOllama({
-    model: "qwen3.8:27b",
+    model: "gemma4:12b",
     file: files[0],
     source: "new",
     conventions: {},
@@ -221,8 +221,8 @@ test("추론과 관련 코드를 포함한 스트리밍 응답을 리뷰 함수�
     request: async (url, options) => {
       const payload = JSON.parse(options.body);
       assert.equal(payload.stream, true);
-      assert.equal(payload.think, true);
-      assert.equal(payload.options.num_predict, 4096);
+      assert.equal(payload.think, false);
+      assert.equal(payload.options.num_predict, 2048);
       assert.deepEqual(
         JSON.parse(payload.messages[1].content).relatedSources,
         relatedSources,
