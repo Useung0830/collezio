@@ -4,7 +4,7 @@ import test from "node:test";
 import { Timestamp } from "firebase/firestore";
 
 import {
-  parseMyProduct,
+  parseProductListItem,
   parseRegisteredProduct,
 } from "../../src/features/products/utils/parseProduct.ts";
 
@@ -23,7 +23,7 @@ const storedProduct = {
 };
 
 test("등록 API가 저장한 문서를 문자열 ID와 대표 사진을 가진 카드로 변환한다", () => {
-  const product = parseMyProduct("firestore-document-id", storedProduct);
+  const product = parseProductListItem("firestore-document-id", storedProduct);
   assert.equal(product.id, "firestore-document-id");
   assert.equal(product.image, storedProduct.images[0].url);
   assert.equal(product.createdAt, "2026-09-21T00:00:00.000Z");
@@ -35,7 +35,7 @@ test("등록 API가 저장한 문서를 문자열 ID와 대표 사진을 가진 
 
 test("판매 상품과 거래 상태를 보존한다", () => {
   for (const status of ["reserved", "completed"]) {
-    const product = parseMyProduct("sale", {
+    const product = parseProductListItem("sale", {
       ...storedProduct,
       transaction: { type: "sale", price: 12000 },
       status,
@@ -50,7 +50,7 @@ test("판매 상품과 거래 상태를 보존한다", () => {
 });
 
 test("사진·등록일·알 수 없는 상태는 가짜 값 대신 빈 값으로 표시한다", () => {
-  const product = parseMyProduct("legacy", {
+  const product = parseProductListItem("legacy", {
     ...storedProduct,
     images: [],
     createdAt: null,
@@ -73,7 +73,8 @@ test("허용하지 않은 이미지 URL을 카드에 전달하지 않는다", ()
     "not-a-url",
   ]) {
     assert.equal(
-      parseMyProduct("image", { ...storedProduct, images: [{ url }] }).image,
+      parseProductListItem("image", { ...storedProduct, images: [{ url }] })
+        .image,
       null,
     );
   }
@@ -90,7 +91,7 @@ test("잘못된 필수 필드와 거래 정보를 성공한 조회로 취급하�
       transaction: { type: "exchange", desiredItemName: "" },
     },
   ]) {
-    assert.throws(() => parseMyProduct("invalid", data));
+    assert.throws(() => parseProductListItem("invalid", data));
   }
 });
 
