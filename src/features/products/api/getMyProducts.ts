@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 
-import { parseMyProduct } from "@/features/products/utils/parseMyProduct";
+import { parseMyProduct } from "@/features/products/utils/parseProduct";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 

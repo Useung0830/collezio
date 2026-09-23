@@ -3,7 +3,10 @@ import test from "node:test";
 
 import { Timestamp } from "firebase/firestore";
 
-import { parseMyProduct } from "../../src/features/products/utils/parseMyProduct.ts";
+import {
+  parseMyProduct,
+  parseRegisteredProduct,
+} from "../../src/features/products/utils/parseProduct.ts";
 
 const storedProduct = {
   title: "교환할 피규어",
@@ -88,4 +91,58 @@ test("잘못된 필수 필드와 거래 정보를 성공한 조회로 취급하�
   ]) {
     assert.throws(() => parseMyProduct("invalid", data));
   }
+});
+
+test("상세 정보는 설명 줄바꿈과 직거래 장소 및 모든 유효한 사진을 보존한다", () => {
+  const secondImage = { url: storedProduct.images[0].url + "2" };
+  const product = parseRegisteredProduct("document-id", {
+    ...storedProduct,
+    description: "첫째 줄\n둘째 줄",
+    delivery: { type: "direct", location: "서울역 1번 출구" },
+    images: [
+      ...storedProduct.images,
+      secondImage,
+      { url: "https://example.com/photo" },
+      secondImage,
+    ],
+  });
+  assert.equal(product.description, "첫째 줄\n둘째 줄");
+  assert.deepEqual(product.delivery, {
+    type: "direct",
+    location: "서울역 1번 출구",
+  });
+  assert.deepEqual(product.imageUrls, [
+    storedProduct.images[0].url,
+    secondImage.url,
+  ]);
+});
+
+test("택배 상품의 무료 배송과 유료 배송을 구분하고 잘못된 상세 필드는 거부한다", () => {
+  const data = {
+    ...storedProduct,
+    description: "상품 설명",
+    delivery: { type: "parcel", shippingFee: 0 },
+  };
+  for (const shippingFee of [0, 3500]) {
+    assert.deepEqual(
+      parseRegisteredProduct("parcel", {
+        ...data,
+        delivery: { type: "parcel", shippingFee },
+      }).delivery,
+      { type: "parcel", shippingFee },
+    );
+  }
+  for (const delivery of [
+    null,
+    { type: "direct", location: "" },
+    { type: "parcel", shippingFee: -1 },
+    { type: "parcel", shippingFee: "3000" },
+  ]) {
+    assert.throws(() =>
+      parseRegisteredProduct("invalid", { ...data, delivery }),
+    );
+  }
+  assert.throws(() =>
+    parseRegisteredProduct("invalid", { ...data, description: null }),
+  );
 });

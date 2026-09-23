@@ -136,11 +136,7 @@ export default function MyProductList() {
             <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-8 xl:grid-cols-4">
               {filteredProducts.map((product) => (
                 <li key={product.id} className="min-w-0">
-                  <ProductCard
-                    product={product}
-                    size="compact"
-                    isLinked={false}
-                  />
+                  <ProductCard product={product} size="compact" />
                 </li>
               ))}
             </ul>

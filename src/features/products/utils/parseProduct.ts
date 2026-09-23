@@ -2,7 +2,9 @@ import { Timestamp } from "firebase/firestore";
 
 import type {
   MyProductListItem,
+  ProductDelivery,
   ProductTransaction,
+  RegisteredProductDetail,
 } from "@/features/products/types/product";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,5 +81,55 @@ export function parseMyProduct(id: string, data: unknown): MyProductListItem {
         : null,
     favoriteCount: getCount(data.favoriteCount),
     chatCount: getCount(data.chatCount),
+  };
+}
+
+function parseDelivery(value: unknown): ProductDelivery {
+  if (isRecord(value)) {
+    if (
+      value.type === "direct" &&
+      typeof value.location === "string" &&
+      value.location.trim()
+    ) {
+      return { type: "direct", location: value.location };
+    }
+    if (
+      value.type === "parcel" &&
+      typeof value.shippingFee === "number" &&
+      Number.isSafeInteger(value.shippingFee) &&
+      value.shippingFee >= 0
+    ) {
+      return { type: "parcel", shippingFee: value.shippingFee };
+    }
+  }
+  throw new Error("상품의 배송 정보를 확인할 수 없습니다.");
+}
+
+export function parseRegisteredProduct(
+  id: string,
+  data: unknown,
+): RegisteredProductDetail {
+  const product = parseMyProduct(id, data);
+  if (
+    !isRecord(data) ||
+    typeof data.description !== "string" ||
+    !data.description.trim()
+  ) {
+    throw new Error("상품 설명을 확인할 수 없습니다.");
+  }
+  const imageUrls = Array.isArray(data.images)
+    ? [
+        ...new Set(
+          data.images
+            .map((image) => getImageUrl([image]))
+            .filter((url) => url !== null),
+        ),
+      ]
+    : [];
+  return {
+    ...product,
+    description: data.description,
+    delivery: parseDelivery(data.delivery),
+    imageUrls,
   };
 }
