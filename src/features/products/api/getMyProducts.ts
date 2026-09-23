@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 
-import { parseMyProduct } from "@/features/products/utils/parseProduct";
+import { parseProductListItem } from "@/features/products/utils/parseProduct";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 
@@ -22,7 +22,7 @@ export async function getMyProducts(userId: string) {
   }
 
   return snapshot.docs
-    .map((document) => parseMyProduct(document.id, document.data()))
+    .map((document) => parseProductListItem(document.id, document.data()))
     .sort((first, second) => {
       const firstTime = first.createdAt ? Date.parse(first.createdAt) : 0;
       const secondTime = second.createdAt ? Date.parse(second.createdAt) : 0;

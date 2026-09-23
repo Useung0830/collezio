@@ -59,7 +59,10 @@ function getCount(value: unknown): number {
     : 0;
 }
 
-export function parseMyProduct(id: string, data: unknown): MyProductListItem {
+export function parseProductListItem(
+  id: string,
+  data: unknown,
+): MyProductListItem {
   if (!isRecord(data) || typeof data.title !== "string" || !data.title.trim()) {
     throw new Error("상품 정보를 확인할 수 없습니다.");
   }
@@ -109,7 +112,7 @@ export function parseRegisteredProduct(
   id: string,
   data: unknown,
 ): RegisteredProductDetail {
-  const product = parseMyProduct(id, data);
+  const product = parseProductListItem(id, data);
   if (
     !isRecord(data) ||
     typeof data.description !== "string" ||

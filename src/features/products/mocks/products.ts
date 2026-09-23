@@ -292,5 +292,3 @@ export const products: ProductListItem[] = productDetails.map((product) => ({
 export const popularProducts = [...products]
   .sort((a, b) => b.favoriteCount - a.favoriteCount)
   .slice(0, 4);
-
-export const newProducts = products.slice(0, 15);
