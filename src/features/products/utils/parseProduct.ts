@@ -129,6 +129,14 @@ export function parseRegisteredProduct(
   return {
     ...product,
     description: data.description,
+    sellerId:
+      typeof data.sellerId === "string" &&
+      data.sellerId.trim() &&
+      !data.sellerId.includes("/") &&
+      data.sellerId !== "." &&
+      data.sellerId !== ".."
+        ? data.sellerId
+        : null,
     delivery: parseDelivery(data.delivery),
     imageUrls,
   };

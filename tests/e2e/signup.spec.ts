@@ -51,8 +51,12 @@ test("비밀번호가 다르면 오류를 표시한다", async ({ page }) => {
   await expect(page).toHaveURL(/\/signup$/);
 });
 
-test("가입 성공 시 토스트를 표시하고 로그인으로 이동한다", async ({ page }) => {
-  await fillSignupForm(page, `${randomUUID()}@example.com`);
+test("가입 성공 시 공개 프로필을 생성하고 로그인으로 이동한다", async ({
+  page,
+  request,
+}) => {
+  const email = `${randomUUID()}@example.com`;
+  await fillSignupForm(page, email);
   await page.getByRole("button", { name: "회원가입", exact: true }).click();
 
   await expect(
@@ -61,6 +65,20 @@ test("가입 성공 시 토스트를 표시하고 로그인으로 이동한다",
     }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/login$/);
+  const login = await request.post(
+    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo-api-key",
+    { data: { email, password: TEST_PASSWORD, returnSecureToken: true } },
+  );
+  expect(login.ok()).toBeTruthy();
+  const { localId } = await login.json();
+  const profile = await request.get(
+    `http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents/profiles/${localId}`,
+  );
+  expect(profile.ok()).toBeTruthy();
+  const { fields } = await profile.json();
+  expect(fields.nickname.stringValue).toBe("테스트회원");
+  expect(fields.email).toBeUndefined();
+  expect(fields.rating).toBeUndefined();
 });
 
 test("이미 가입된 이메일이면 오류를 표시한다", async ({ page, request }) => {

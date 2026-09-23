@@ -9,6 +9,7 @@ import {
 } from "../../src/features/products/utils/parseProduct.ts";
 
 const storedProduct = {
+  sellerId: "seller-uid",
   title: "교환할 피규어",
   transaction: { type: "exchange", desiredItemName: "탄지로 피규어" },
   images: [
@@ -107,6 +108,7 @@ test("상세 정보는 설명 줄바꿈과 직거래 장소 및 모든 유효한
     ],
   });
   assert.equal(product.description, "첫째 줄\n둘째 줄");
+  assert.equal(product.sellerId, "seller-uid");
   assert.deepEqual(product.delivery, {
     type: "direct",
     location: "서울역 1번 출구",
@@ -115,6 +117,19 @@ test("상세 정보는 설명 줄바꿈과 직거래 장소 및 모든 유효한
     storedProduct.images[0].url,
     secondImage.url,
   ]);
+});
+
+test("판매자 ID가 누락되거나 경로이면 상품 내용은 유지하고 프로필 조회는 생략한다", () => {
+  for (const sellerId of [null, undefined, "", " ", "profiles/user", ".", ".."])
+    assert.equal(
+      parseRegisteredProduct("product", {
+        ...storedProduct,
+        sellerId,
+        description: "설명",
+        delivery: { type: "parcel", shippingFee: 0 },
+      }).sellerId,
+      null,
+    );
 });
 
 test("택배 상품의 무료 배송과 유료 배송을 구분하고 잘못된 상세 필드는 거부한다", () => {

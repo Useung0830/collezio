@@ -5,7 +5,7 @@ export const test = base.extend<{ blockProductionAuth: void }>({
     async ({ context }, use) => {
       const blockedRequests: string[] = [];
       await context.route(
-        /^https:\/\/(identitytoolkit|securetoken)\.googleapis\.com\//,
+        /^https:\/\/(identitytoolkit|securetoken|firestore)\.googleapis\.com\//,
         async (route) => {
           blockedRequests.push(route.request().url());
           await route.abort();

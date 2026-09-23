@@ -16,6 +16,7 @@
 /test-results/
 /.firebase/
 firebase-debug*.log
+firestore-debug*.log
 
 # next.js
 /.next/

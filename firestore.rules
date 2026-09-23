@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{userId} {
+      allow get: if true;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['nickname', 'imageUrl', 'bio', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['nickname', 'imageUrl', 'bio', 'createdAt'])
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() > 0
+        && request.resource.data.nickname.size() <= 100
+        && request.resource.data.imageUrl == null
+        && request.resource.data.bio == ''
+        && request.resource.data.createdAt == request.time;
+    }
+
+    // 운영 상품 규칙을 보존합니다. 프로필 권한은 위 경로에만 추가합니다.
+    match /products/{productId} {
+      function isValidProductText(data) {
+        return data.title is string && data.title.size() > 0 && data.title.size() <= 100
+          && data.description is string && data.description.size() > 0 && data.description.size() <= 5000;
+      }
+      function isValidTransaction(transaction) {
+        return transaction is map && (
+          (transaction.type == 'sale' && transaction.keys().hasOnly(['type', 'price'])
+            && transaction.price is int && transaction.price >= 0)
+          || (transaction.type == 'exchange' && transaction.keys().hasOnly(['type', 'desiredItemName'])
+            && transaction.desiredItemName is string && transaction.desiredItemName.size() > 0
+            && transaction.desiredItemName.size() <= 100)
+        );
+      }
+      function isValidDelivery(delivery) {
+        return delivery is map && (
+          (delivery.type == 'direct' && delivery.keys().hasOnly(['type', 'location'])
+            && delivery.location is string && delivery.location.size() > 0 && delivery.location.size() <= 200)
+          || (delivery.type == 'parcel' && delivery.keys().hasOnly(['type', 'shippingFee'])
+            && delivery.shippingFee is int && delivery.shippingFee >= 0)
+        );
+      }
+      function isValidProductFields(data) {
+        let fields = ['title', 'description', 'transaction', 'delivery', 'images', 'sellerId', 'status', 'createdAt'];
+        return data.keys().hasAll(fields) && data.keys().hasOnly(fields);
+      }
+      function isValidImage(image) {
+        return image is map && image.keys().hasAll(['url', 'path']) && image.keys().hasOnly(['url', 'path'])
+          && image.url is string && image.url.size() <= 2048 && image.url.matches('https://.+')
+          && image.path is string && image.path.size() > 0 && image.path.size() <= 1024;
+      }
+      function isValidImageAt(images, index) {
+        return images.size() <= index || isValidImage(images[index]);
+      }
+      function isValidImages(images) {
+        return images is list && images.size() >= 1 && images.size() <= 10
+          && isValidImageAt(images, 0) && isValidImageAt(images, 1)
+          && isValidImageAt(images, 2) && isValidImageAt(images, 3)
+          && isValidImageAt(images, 4) && isValidImageAt(images, 5)
+          && isValidImageAt(images, 6) && isValidImageAt(images, 7)
+          && isValidImageAt(images, 8) && isValidImageAt(images, 9);
+      }
+      allow read: if true;
+      allow create: if request.auth != null
+        && isValidProductFields(request.resource.data)
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.status == 'available'
+        && request.resource.data.createdAt == request.time
+        && isValidProductText(request.resource.data)
+        && isValidTransaction(request.resource.data.transaction)
+        && isValidDelivery(request.resource.data.delivery)
+        && isValidImages(request.resource.data.images);
+    }
+  }
+}

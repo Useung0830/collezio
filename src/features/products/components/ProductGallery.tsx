@@ -16,15 +16,15 @@ export default function ProductGallery({
   const selectedImage = imageUrls[selectedIndex] ?? imageUrls[0];
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-3">
-      <div className="bg-black-100 relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl">
+    <div className="flex min-w-0 flex-col gap-6">
+      <div className="bg-black-100 relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg md:rounded-2xl">
         {selectedImage ? (
           <Image
             src={selectedImage}
             alt={title}
             fill
             sizes="(min-width: 768px) 50vw, 100vw"
-            className="object-contain"
+            className="object-cover"
           />
         ) : (
           <p className="text-body-16 text-black-600">등록된 사진이 없습니다.</p>

@@ -2,7 +2,7 @@ import "client-only";
 
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -31,5 +31,6 @@ if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
 
   if (typeof window !== "undefined" && !firebaseAuth.emulatorConfig) {
     connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099");
+    connectFirestoreEmulator(firebaseDb, "127.0.0.1", 8080);
   }
 }

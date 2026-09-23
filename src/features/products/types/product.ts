@@ -73,6 +73,7 @@ export interface ProductDetail {
 }
 
 export interface RegisteredProductDetail extends MyProductListItem {
+  sellerId: string | null;
   description: string;
   delivery: ProductDelivery;
   imageUrls: string[];
