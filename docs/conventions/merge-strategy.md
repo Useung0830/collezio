@@ -39,8 +39,19 @@ Squash Merge로 병합된다. 충돌은 직접 해결해야 한다.
 - `main` 대상 PR은 직접 확인한 뒤 Merge Commit으로 병합한다.
 
 저장소의 **Allow auto-merge**와 **Allow squash merging**이 켜져 있어야 한다.
-`dev` 규칙에는 `Check and Build`, `Signup E2E`를 필수 검사로 등록한다.
+`dev` 규칙에는 `Check and Build`, `Signup E2E`, `Local Code Review`를 필수 검사로 등록한다.
+`Local Code Review`는 로컬 프로그램이 올리는 commit status이므로 특정 GitHub App으로 제한하지 않는다.
+또한 **Require conversation resolution before merging**을 활성화한다.
 `Configure Auto Merge`는 필수 검사로 지정하지 않는다.
+
+로컬 모델이 최신 커밋의 검토 결과를 게시한 뒤에만 `Local Code Review`가 성공한다.
+지적이 있다면 코드 수정 또는 판단 이유를 남긴 뒤 각 리뷰의 **Resolve conversation**을 누른다.
+모든 리뷰 대화가 해결되고 필수 검사가 성공하면 별도로 자동 병합을 켜지 않아도 병합된다.
+지적이 없으면 필수 검사 통과 후 바로 병합된다. `Viewed` 체크박스는 병합 조건이 아니다.
+새 커밋에는 새 리뷰가 필요하며, 오래된 미해결 대화도 자동으로 해결 처리하지 않는다.
+
+로컬 모델 리뷰는 정확성을 보장하는 승인이 아니다. PC가 꺼져 있거나 리뷰가 실패하면 병합은 대기한다.
+설정과 실행 방법은 [로컬 코드 리뷰 운영 문서](../local-code-review.md)를 참고한다.
 
 이 워크플로우는 `pull_request_target`을 사용하므로 저장소 기본 브랜치에 먼저
 반영해야 한다. 최초 도입 PR은 직접 병합하거나 자동 병합 버튼을 눌러 처리한다.
