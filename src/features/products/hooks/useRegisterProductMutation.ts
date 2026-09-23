@@ -9,6 +9,9 @@ export function useRegisterProductMutation() {
     mutationFn: registerProduct,
     retry: false,
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: productQueryKeys.mine }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: productQueryKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: productQueryKeys.newest }),
+      ]),
   });
 }
