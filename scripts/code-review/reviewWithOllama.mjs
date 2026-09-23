@@ -1,9 +1,10 @@
 import { getDiffLines } from "./publishCodeReview.mjs";
+import { readOllamaStream } from "./readOllamaStream.mjs";
 
-const MAX_INPUT_BYTES = 48_000;
+const MAX_INPUT_BYTES = 80_000;
 const MAX_CHANGED_FILES = 30;
 const CONTEXT_TOKENS = 32_768;
-const OUTPUT_TOKENS = 2048;
+const OUTPUT_TOKENS = 4096;
 
 export const reviewSchema = {
   type: "object",
@@ -69,6 +70,7 @@ export async function reviewWithOllama({
   source,
   conventions,
   relatedChanges,
+  relatedSources = [],
   request = fetch,
 }) {
   const diffLines = getDiffLines(file.patch);
@@ -109,6 +111,7 @@ Output schema: ${JSON.stringify(schema)}`,
         diff: file.patch,
         source,
         relatedChanges,
+        relatedSources,
         conventions,
       }),
     },
@@ -125,8 +128,8 @@ Output schema: ${JSON.stringify(schema)}`,
       model,
       messages,
       format: schema,
-      stream: false,
-      think: false,
+      stream: true,
+      think: true,
       keep_alive: "5m",
       options: {
         temperature: 0,
@@ -134,11 +137,11 @@ Output schema: ${JSON.stringify(schema)}`,
         num_predict: OUTPUT_TOKENS,
       },
     }),
-    signal: AbortSignal.timeout(10 * 60_000),
+    signal: AbortSignal.timeout(15 * 60_000),
     redirect: "error",
   });
   if (!response.ok) throw new Error(`Ollama 요청 실패: ${response.status}`);
-  const result = await response.json();
+  const result = await readOllamaStream(response);
   if (
     result.error ||
     result.done !== true ||

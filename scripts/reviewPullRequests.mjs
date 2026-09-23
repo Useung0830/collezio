@@ -11,6 +11,7 @@ import {
   parseCodeReview,
   publishCodeReview,
 } from "./code-review/publishCodeReview.mjs";
+import { readRelatedSources } from "./code-review/readRelatedSources.mjs";
 import {
   getConventionPaths,
   reviewWithOllama,
@@ -22,7 +23,7 @@ const isDryRun = args.includes("--dry-run");
 const isWatching = args.includes("--watch");
 const prIndex = args.indexOf("--pr");
 const pullNumber = prIndex >= 0 ? Number(args[prIndex + 1]) : null;
-const model = process.env.LOCAL_REVIEW_MODEL || "gemma4:12b";
+const model = process.env.LOCAL_REVIEW_MODEL || "qwen3.8:27b";
 const repositoryPath = `/repos/${REPOSITORY}`;
 
 if (
@@ -115,6 +116,13 @@ async function reviewPullRequest(pullRequest) {
     );
     const reviewFiles = selectReviewFiles(files);
     const conventionCache = new Map();
+    const sourceCache = new Map();
+    const readSource = async (path, ref) => {
+      const key = `${ref}:${path}`;
+      if (!sourceCache.has(key))
+        sourceCache.set(key, await readRemoteFile(path, ref));
+      return sourceCache.get(key);
+    };
     const findings = [];
     const summaries = [];
     for (const file of reviewFiles) {
@@ -128,7 +136,7 @@ async function reviewPullRequest(pullRequest) {
           );
         conventions[path] = conventionCache.get(path);
       }
-      const source = await readRemoteFile(
+      const source = await readSource(
         file.status === "removed"
           ? file.previous_filename || file.filename
           : file.filename,
@@ -137,12 +145,22 @@ async function reviewPullRequest(pullRequest) {
       const relatedChanges = files
         .filter((item) => item.filename !== file.filename)
         .map((item) => ({ path: item.filename, status: item.status }));
+      const relatedSources = await readRelatedSources({
+        filename:
+          file.status === "removed"
+            ? file.previous_filename || file.filename
+            : file.filename,
+        source,
+        sha: file.status === "removed" ? pullRequest.base.sha : sha,
+        readFile: readSource,
+      });
       const rawReview = await reviewWithOllama({
         model,
         file,
         source,
         conventions,
         relatedChanges,
+        relatedSources,
       });
       const parsed = parseCodeReview(rawReview, [file]);
       findings.push(...parsed.comments);
@@ -197,6 +215,10 @@ async function reviewPullRequest(pullRequest) {
   }
 }
 
+await checkLocalModel();
+log(
+  `리뷰 프로그램 시작 (${model}, 추론 활성화, ${isWatching ? "60초 간격 감시" : "단일 실행"})`,
+);
 do {
   try {
     const pullRequests = pullNumber
