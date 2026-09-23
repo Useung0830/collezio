@@ -1,35 +1,24 @@
-import Image from "next/image";
+"use client";
 
-import Button from "@/components/common/button/Button";
-
-import EditIcon from "@/assets/icons/icon-edit.svg";
-import profileImage from "@/assets/images/profile.png";
+import PublicProfileCard from "@/features/user/components/PublicProfileCard";
+import { useProfileUserId } from "@/features/user/hooks/useProfileUserId";
 
 export default function ProfileSummary() {
+  const userId = useProfileUserId();
   return (
-    <section className="border-black-200 text-black-900 flex items-center justify-between gap-4 rounded-2xl border px-7 py-5">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-full">
-          <Image
-            src={profileImage}
-            alt="컬렉션 모아모아 프로필"
-            className="object-cover"
-            fill
-            sizes="80px"
-          />
-        </div>
-        <div className="flex max-w-120 min-w-0 flex-col gap-3">
-          <h1 className="text-heading-20">컬렉션 모아모아</h1>
-          <p className="text-body-14 text-black-600 max-md:hidden">
-            안녕하세요. 여러 피규어를 모으고 있습니다. 특히 주토피아 너무
-            좋아합니다.
-          </p>
-        </div>
-      </div>
-      <Button size="compact" aria-haspopup="dialog">
-        <EditIcon className="size-4" aria-hidden="true" />
-        <span>프로필 수정</span>
-      </Button>
+    <section
+      aria-label="내 프로필"
+      className="border-black-200 text-black-900 flex items-center gap-4 rounded-2xl border px-7 py-5"
+    >
+      {userId === undefined ? (
+        <p role="status" className="text-body-16">
+          로그인 상태를 확인하고 있습니다.
+        </p>
+      ) : userId ? (
+        <PublicProfileCard userId={userId} showBio />
+      ) : (
+        <p className="text-body-16">로그인 후 프로필을 확인해주세요.</p>
+      )}
     </section>
   );
 }

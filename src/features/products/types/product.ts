@@ -44,13 +44,20 @@ export interface ProductDetailMetrics {
 }
 
 export interface ProductListItem {
-  id: number;
+  id: number | string;
   title: string;
-  createdAt: string;
-  image: StaticImageData;
+  createdAt: string | null;
+  image: StaticImageData | string | null;
   transaction: ProductTransaction;
   favoriteCount: number;
   chatCount: number;
+}
+
+export type ProductStatus = "available" | "reserved" | "completed";
+
+export interface MyProductListItem extends ProductListItem {
+  id: string;
+  status: ProductStatus | null;
 }
 
 export interface ProductDetail {
@@ -63,4 +70,11 @@ export interface ProductDetail {
   transaction: ProductTransaction;
   seller: ProductSeller;
   metrics: ProductDetailMetrics;
+}
+
+export interface RegisteredProductDetail extends MyProductListItem {
+  sellerId: string | null;
+  description: string;
+  delivery: ProductDelivery;
+  imageUrls: string[];
 }
