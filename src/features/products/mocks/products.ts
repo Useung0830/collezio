@@ -3,7 +3,7 @@ import type {
   ProductListItem,
 } from "@/features/products/types/product";
 
-import productImage from "@/assets/images/product-luffy-figure.jpg";
+import productImage from "@/assets/images/product-luffy-cutout.png";
 
 export const productDetails: ProductDetail[] = [
   {
