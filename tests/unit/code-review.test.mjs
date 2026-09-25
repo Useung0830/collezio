@@ -5,6 +5,8 @@ import {
   parseCodeReview,
   publishCodeReview,
 } from "../../scripts/code-review/publishCodeReview.mjs";
+import { readOllamaStream } from "../../scripts/code-review/readOllamaStream.mjs";
+import { readRelatedSources } from "../../scripts/code-review/readRelatedSources.mjs";
 import {
   reviewWithOllama,
   selectReviewFiles,
@@ -157,15 +159,123 @@ test("로컬 모델의 잘린 출력·문맥 초과를 성공으로 취급하지
         relatedChanges: [],
         request: async (url) => {
           assert.equal(url, "http://127.0.0.1:11434/api/chat");
-          return {
-            ok: true,
-            json: async () => ({
+          return new Response(
+            JSON.stringify({
               message: { content: serializeReview() },
               ...result,
             }),
-          };
+          );
         },
       }),
     );
   }
+});
+
+test("스트리밍 한글과 JSON 조각을 복원하고 추론 텍스트는 결과에서 제외한다", async () => {
+  const raw = serializeReview([]);
+  const wire = [
+    { message: { thinking: "검토 중" } },
+    { message: { content: raw.slice(0, 30) } },
+    { message: { content: raw.slice(30) } },
+    { done: true, done_reason: "stop", prompt_eval_count: 100 },
+  ]
+    .map(JSON.stringify)
+    .join("\n");
+  const bytes = new TextEncoder().encode(wire);
+  const response = new Response(
+    new ReadableStream({
+      start(controller) {
+        for (let index = 0; index < bytes.length; index += 7)
+          controller.enqueue(bytes.slice(index, index + 7));
+        controller.close();
+      },
+    }),
+  );
+  const result = await readOllamaStream(response);
+  assert.equal(result.message.content, raw);
+  assert.equal(result.message.thinking, undefined);
+  assert.equal(result.done, true);
+});
+
+test("스트림 중단·오류·잘못된 JSON·완료 이후 데이터는 거부한다", async () => {
+  for (const wire of [
+    JSON.stringify({ message: { content: serializeReview([]) } }),
+    '{"error":"failed"}',
+    "not-json",
+    '{"done":true}\n{"message":{"content":"extra"}}',
+  ])
+    await assert.rejects(readOllamaStream(new Response(wire)));
+});
+
+test("추론 없이 관련 코드를 포함한 스트리밍 응답을 리뷰 함수가 처리한다", async () => {
+  const relatedSources = [
+    { path: "src/helper.ts", source: "export const x = 1;" },
+  ];
+  const raw = await reviewWithOllama({
+    model: "gemma4:12b",
+    file: files[0],
+    source: "new",
+    conventions: {},
+    relatedChanges: [],
+    relatedSources,
+    request: async (url, options) => {
+      const payload = JSON.parse(options.body);
+      assert.equal(payload.stream, true);
+      assert.equal(payload.think, false);
+      assert.equal(payload.options.num_predict, 2048);
+      assert.deepEqual(
+        JSON.parse(payload.messages[1].content).relatedSources,
+        relatedSources,
+      );
+      return new Response(
+        JSON.stringify({
+          done: true,
+          done_reason: "stop",
+          prompt_eval_count: 100,
+          message: { content: serializeReview([]) },
+        }),
+      );
+    },
+  });
+  assert.deepEqual(parseCodeReview(raw, files).comments, []);
+});
+
+test("관련 코드는 src 경계와 같은 커밋에서만 읽고 중복·외부 경로를 제외한다", async () => {
+  const calls = [];
+  const related = await readRelatedSources({
+    filename: "src/feature/main.ts",
+    sha: "fixed-sha",
+    source: `import x from "@/helper"; import y from "../helper"; import z from "../../.env"; import a from "@/../secret"; import react from "react";`,
+    readFile: async (path, sha) => {
+      calls.push({ path, sha });
+      return "export const value = 1;";
+    },
+  });
+  assert.deepEqual(calls, [{ path: "src/helper.ts", sha: "fixed-sha" }]);
+  assert.equal(related.length, 1);
+});
+
+test("관련 파일의 404만 건너뛰고 인증 실패는 숨기지 않는다", async () => {
+  const input = {
+    filename: "src/main.ts",
+    source: 'import x from "@/missing";',
+    sha: "sha",
+  };
+  assert.deepEqual(
+    await readRelatedSources({
+      ...input,
+      readFile: async () => {
+        throw new Error("GitHub 요청 실패: 404 GET path");
+      },
+    }),
+    [],
+  );
+  await assert.rejects(
+    readRelatedSources({
+      ...input,
+      readFile: async () => {
+        throw new Error("GitHub 요청 실패: 401 GET path");
+      },
+    }),
+  );
 });
