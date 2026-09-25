@@ -8,18 +8,23 @@ import formatRelativeTime from "@/utils/formatRelativeTime";
 import ChatIcon from "@/assets/icons/icon-chat.svg";
 import GalleryIcon from "@/assets/icons/icon-gallery.svg";
 import HeartIcon from "@/assets/icons/icon-heart.svg";
+import styles from "./productShowcase.module.css";
 
 interface ProductCardProps {
   product: ProductListItem;
   size?: "default" | "compact";
   isLinked?: boolean;
+  appearance?: "default" | "showcase";
 }
 
 export default function ProductCard({
   product,
   size = "default",
   isLinked = true,
+  appearance = "default",
 }: ProductCardProps) {
+  const isShowcase = appearance === "showcase";
+  const productImage = product.image;
   const isSale = product.transaction.type === "sale";
   const transactionColor = isSale ? "bg-brand-blue" : "bg-brand-green";
 
@@ -44,19 +49,38 @@ export default function ProductCard({
       : "(min-width: 768px) 268px, 50vw";
 
   const content = (
-    <article className="flex flex-col gap-3 sm:gap-4">
-      <div className="relative aspect-square w-full overflow-hidden rounded-2xl">
-        {product.image ? (
-          <Image
-            src={product.image}
-            alt={product.title}
-            fill
-            sizes={imageSizes}
-            className="object-cover"
-          />
+    <article
+      className={isShowcase ? styles.card : "flex flex-col gap-3 sm:gap-4"}
+    >
+      <div
+        className={
+          isShowcase
+            ? styles.display
+            : "relative aspect-square w-full overflow-hidden rounded-2xl"
+        }
+      >
+        {isShowcase && (
+          <>
+            <span className={styles.interior} aria-hidden="true" />
+            <span className={styles.reflection} aria-hidden="true" />
+            {productImage && (
+              <span className={styles.contactShadow} aria-hidden="true" />
+            )}
+          </>
+        )}
+        {productImage ? (
+          <div className={isShowcase ? styles.imageMount : undefined}>
+            <Image
+              src={productImage}
+              alt={product.title}
+              fill
+              sizes={imageSizes}
+              className={isShowcase ? styles.productImage : "object-cover"}
+            />
+          </div>
         ) : (
           <div
-            className="bg-black-100 text-black-600 flex h-full items-center justify-center"
+            className={`text-black-600 flex h-full items-center justify-center ${isShowcase ? styles.placeholder : "bg-black-100"}`}
             role="img"
             aria-label="상품 사진 없음"
           >
@@ -65,7 +89,9 @@ export default function ProductCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 sm:gap-3">
+      <div
+        className={`flex flex-col gap-2 sm:gap-3 ${isShowcase ? styles.label : ""}`}
+      >
         <h3 className={`${titleClassName} text-black-900`}>{product.title}</h3>
         <div className="flex items-center gap-1">
           <div
@@ -79,7 +105,9 @@ export default function ProductCard({
             {transactionLabel}
           </p>
         </div>
-        <div className="text-caption-13 text-black-600 sm:text-body-16 flex items-center gap-2">
+        <div
+          className={`text-caption-13 text-black-600 sm:text-body-16 flex items-center gap-2 ${isShowcase ? "flex-wrap" : ""}`}
+        >
           <div className="flex gap-1">
             <div className="flex items-center gap-0.5">
               <HeartIcon className="size-4" />
@@ -102,7 +130,12 @@ export default function ProductCard({
   );
 
   return isLinked ? (
-    <Link href={`/products/${product.id}`}>{content}</Link>
+    <Link
+      href={`/products/${product.id}`}
+      className={isShowcase ? styles.link : undefined}
+    >
+      {content}
+    </Link>
   ) : (
     content
   );

@@ -1,3 +1,39 @@
+.text-banner-title {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+.text-banner-description {
+  font-family: var(--font-pretendard, Pretendard), sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.004em;
+}
+
+@media (min-width: 768px) {
+  .text-banner-title {
+    font-size: 32px;
+  }
+
+  .text-banner-description {
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .text-banner-title {
+    font-size: 42px;
+  }
+
+  .text-banner-description {
+    font-size: 16px;
+  }
+}
+
 .text-display-40 {
   font-family: var(--font-pretendard, Pretendard), sans-serif;
   font-size: 40px;

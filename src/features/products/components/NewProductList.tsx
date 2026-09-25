@@ -4,7 +4,10 @@ import { useState } from "react";
 
 import Button from "@/components/common/button/Button";
 import ProductCard from "@/features/products/components/ProductCard";
+import ProductShowcaseEmptySlots from "@/features/products/components/ProductShowcaseEmptySlots";
 import { useNewProductsQuery } from "@/features/products/hooks/useNewProductsQuery";
+
+import styles from "./productShowcase.module.css";
 
 const INITIAL_VISIBLE_PRODUCT_COUNT = 10;
 const PRODUCT_LOAD_COUNT = 10;
@@ -59,13 +62,21 @@ export default function NewProductList() {
         <>
           <ul
             id="new-product-list"
-            className="grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 lg:grid-cols-5 lg:gap-y-13"
+            className={`${styles.cabinet} ${styles.openShowcase} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`}
           >
             {visibleProducts.map((product) => (
-              <li key={product.id} className="min-w-0">
-                <ProductCard product={product} size="compact" />
+              <li key={product.id} className={styles.compartment}>
+                <ProductCard
+                  product={product}
+                  size="compact"
+                  appearance="showcase"
+                />
               </li>
             ))}
+            <ProductShowcaseEmptySlots
+              productCount={visibleProducts.length}
+              size="compact"
+            />
           </ul>
 
           {hasMoreProducts && (
