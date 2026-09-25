@@ -19,10 +19,7 @@ type MobileMenuDrawerProps = {
   onClose: () => void;
 };
 
-const exchangeMenus = [
-  { label: "보유품 목록", href: "/collections" },
-  { label: "매칭 내역", href: "/matches" },
-];
+const exchangeMenus = [{ label: "보유품 목록", href: "/collections" }];
 
 const userMenus = [
   { label: "찜한 컬렉션", href: "/favorites" },
