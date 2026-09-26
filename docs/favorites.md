@@ -7,7 +7,18 @@
 3. 마이페이지의 목업 목록을 본인 찜 상품 조회로 교체
 4. 화면 전체 흐름과 예외 상황 검증
 
-현재 1단계까지 구현했다. 상세 버튼과 마이페이지 목록은 아직 연결하지 않았다.
+현재 2단계까지 구현했다. 상품 상세 찜 버튼은 실제 API에 연결했으며, 마이페이지 찜 목록은 아직 목업이다.
+
+## 상품 상세 화면
+
+- 사용자 ID와 상품 ID를 포함한 쿼리 키로 찜 여부를 조회한다. 비로그인 상태에서는 본인 찜 기록을 조회하지 않는다.
+- 찜 상태 확인 중과 저장 중에는 버튼을 비활성화한다. 비로그인 클릭 시 로그인 안내와 링크를 표시한다.
+- 저장 성공 응답으로 하트 선택 상태와 상세 카운트를 갱신한다. 요청 전에는 숫자를 미리 바꾸지 않는다.
+- 완료 후 상품과 찜 쿼리를 무효화해 활성 화면을 다시 조회한다. 실패했을 때도 서버 반영 여부를 다시 확인한다.
+- 조회 실패 시 재조회 버튼, 저장 실패 시 오류 안내를 표시한다. 연결이 끊긴 상태에서 누른 요청은 TanStack Query가 연결 복구까지 대기하며 대기 안내를 표시한다.
+- API 자체는 오프라인 저장을 하지 않는다. 사용자 계정이 바뀌면 대기 중이던 이전 계정 요청은 API의 사용자 검사에서 거부된다.
+
+캐시 갱신은 [TanStack Query의 mutation 후 무효화 방식](https://tanstack.com/query/latest/docs/framework/react/guides/invalidations-from-mutations)을 사용한다.
 
 ## 저장 구조
 
@@ -42,6 +53,7 @@
 npm run check
 npm run build
 npm run test:unit
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore "npx playwright test tests/e2e/favorites.spec.ts"
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore "node --test tests/integration/*.test.mjs"
 ```
 
