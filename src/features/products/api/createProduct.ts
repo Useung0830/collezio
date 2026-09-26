@@ -31,6 +31,7 @@ export async function createProduct({
     images,
     sellerId: user.uid,
     status: "available",
+    favoriteCount: 0,
     createdAt: serverTimestamp(),
   });
 
