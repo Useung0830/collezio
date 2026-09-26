@@ -62,6 +62,11 @@ async function login(page: Page, request: APIRequestContext) {
   );
   expect(response.ok()).toBeTruthy();
   const account = await response.json();
+  const profileResponse = await request.post(
+    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:update?key=demo-api-key",
+    { data: { idToken: account.idToken, displayName: "찜 테스트 사용자" } },
+  );
+  expect(profileResponse.ok()).toBeTruthy();
   await page.goto("/login");
   await page.getByLabel("이메일", { exact: true }).fill(email);
   await page.getByLabel("비밀번호", { exact: true }).fill(password);
@@ -70,6 +75,15 @@ async function login(page: Page, request: APIRequestContext) {
   const userId: unknown = account.localId;
   if (typeof userId !== "string") throw new Error("테스트 계정 ID가 없습니다.");
   return userId;
+}
+
+async function addFavorite(page: Page, productId: string) {
+  await page.goto(`/products/${productId}`);
+  const button = page.getByRole("button", { name: "찜", exact: true });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await expect(button).toBeEnabled();
 }
 
 test("비로그인 찜 클릭은 로그인 안내를 표시하고 카운트를 유지한다", async ({
@@ -265,4 +279,104 @@ test("상세에서 찜한 상품을 목록에서 열고 취소 후 뒤로 가면
   await expect(favorites.getByRole("heading", { level: 2 })).toHaveText(
     "찜한 컬렉션0",
   );
+});
+
+test("다른 탭에서 계정을 바꾸면 이전 사용자의 찜 목록과 선택 상태를 지운다", async ({
+  page,
+  context,
+  request,
+  productId,
+}) => {
+  const firstUserId = await login(page, request);
+  await addFavorite(page, productId);
+  await page.goto("/favorites");
+  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
+  await expect(favorites.getByRole("heading", { level: 3 })).toHaveText([
+    "찜 테스트 상품",
+  ]);
+  const secondPage = await context.newPage();
+  try {
+    await login(secondPage, request);
+    await expect(
+      favorites.getByText("아직 찜한 상품이 없습니다."),
+    ).toBeVisible();
+    await expect(favorites.getByRole("heading", { level: 3 })).toHaveCount(0);
+    await page.goto(`/products/${productId}`);
+    const button = page.getByRole("button", { name: "찜", exact: true });
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByText("찜 1", { exact: true })).toBeVisible();
+    await button.click();
+    await expect(page.getByText("찜 2", { exact: true })).toBeVisible();
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(page.getByText("찜 1", { exact: true })).toBeVisible();
+    const firstFavorite = await request.get(
+      `${documentsUrl}/users/${firstUserId}/favorites/${productId}`,
+      { headers: ownerHeaders },
+    );
+    expect(firstFavorite.ok()).toBeTruthy();
+  } finally {
+    await secondPage.close();
+  }
+});
+
+test("삭제된 상품은 찜 목록과 표시 개수에서 제외한다", async ({
+  page,
+  request,
+  productId,
+}) => {
+  await login(page, request);
+  await addFavorite(page, productId);
+  const response = await request.delete(
+    `${documentsUrl}/products/${productId}`,
+    { headers: ownerHeaders },
+  );
+  expect(response.ok()).toBeTruthy();
+  await page.goto("/favorites");
+  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
+  await expect(favorites.getByText("아직 찜한 상품이 없습니다.")).toBeVisible();
+  await expect(favorites.getByRole("heading", { level: 2 })).toHaveText(
+    "찜한 컬렉션0",
+  );
+});
+
+test("목록 조회 오류를 표시하고 재시도해 복구한다", async ({
+  page,
+  request,
+  productId,
+}) => {
+  await login(page, request);
+  await addFavorite(page, productId);
+  const productUrl = `${documentsUrl}/products/${productId}?updateMask.fieldPaths=title`;
+  const invalid = await request.patch(productUrl, {
+    headers: ownerHeaders,
+    data: { fields: { title: { stringValue: "" } } },
+  });
+  expect(invalid.ok()).toBeTruthy();
+  await page.goto("/favorites");
+  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
+  await expect(favorites.getByRole("alert")).toHaveText(
+    "찜한 상품을 불러오지 못했습니다. 다시 시도해주세요.",
+  );
+  const restored = await request.patch(productUrl, {
+    headers: ownerHeaders,
+    data: { fields: { title: { stringValue: "찜 테스트 상품" } } },
+  });
+  expect(restored.ok()).toBeTruthy();
+  await favorites.getByRole("button", { name: "다시 시도" }).click();
+  await expect(favorites.getByRole("heading", { level: 3 })).toHaveText([
+    "찜 테스트 상품",
+  ]);
+  await expect(favorites.getByRole("alert")).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "test-results/favorites-list-mobile.png",
+    fullPage: true,
+  });
 });

@@ -56,6 +56,8 @@ test("찜 API와 권한 규칙", async (t) => {
     await import("../../src/features/favorite/api/updateProductFavorite.ts");
   const { getProductFavorite } =
     await import("../../src/features/favorite/api/getProductFavorite.ts");
+  const { getFavoriteProducts } =
+    await import("../../src/features/favorite/api/getFavoriteProducts.ts");
   const { createProduct } =
     await import("../../src/features/products/api/createProduct.ts");
 
@@ -290,6 +292,10 @@ test("찜 API와 권한 규칙", async (t) => {
           getProductFavorite(productId, secondUser.uid),
           /로그인 상태/,
         );
+        await assert.rejects(
+          getFavoriteProducts(secondUser.uid),
+          /로그인 상태/,
+        );
       },
     );
 
@@ -319,9 +325,45 @@ test("찜 API와 권한 규칙", async (t) => {
     );
 
     await t.test(
+      "찜 목록은 30개 경계를 넘어 최신순으로 조회하고 삭제된 상품을 제외한다",
+      async () => {
+        assert.deepEqual(await getFavoriteProducts(user.uid), []);
+        const productIds = [];
+        for (let index = 0; index < 31; index += 1) {
+          const id = await createProduct({
+            ...input,
+            title: `목록 상품 ${index}`,
+          });
+          await updateProductFavorite({
+            productId: id,
+            userId: user.uid,
+            isFavorite: true,
+          });
+          productIds.unshift(id);
+        }
+        const products = await getFavoriteProducts(user.uid);
+        assert.deepEqual(
+          products.map((product) => product.id),
+          productIds,
+        );
+        assert.ok(products.every((product) => product.favoriteCount === 1));
+        const response = await fetch(
+          `http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/demo-collezio/databases/(default)/documents/products/${productIds[0]}`,
+          { method: "DELETE", headers: { Authorization: "Bearer owner" } },
+        );
+        assert.equal(response.ok, true);
+        assert.deepEqual(
+          (await getFavoriteProducts(user.uid)).map((product) => product.id),
+          productIds.slice(1),
+        );
+      },
+    );
+
+    await t.test(
       "로그아웃 후 조회·변경을 거부하고 상품 공개 조회는 유지한다",
       async () => {
         await signOut(firebaseAuth);
+        await assert.rejects(getFavoriteProducts(user.uid), /로그인 상태/);
         await assert.rejects(update(true), /로그인 상태/);
         await assert.rejects(
           getProductFavorite(productId, user.uid),

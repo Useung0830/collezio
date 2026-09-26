@@ -7,7 +7,7 @@
 3. 마이페이지의 목업 목록을 본인 찜 상품 조회로 교체
 4. 화면 전체 흐름과 예외 상황 검증
 
-현재 3단계까지 구현했다. 상품 상세 찜 버튼과 마이페이지 찜 목록이 실제 API에 연결되어 있다.
+4단계까지 구현과 로컬 검증을 완료했다. 상품 상세에서 찜 추가·취소 및 카운트 저장이 가능하고, 마이페이지에서 본인이 찜한 상품을 확인할 수 있다.
 
 ## 찜 목록
 
@@ -17,6 +17,8 @@
 - 사용자별 쿼리 키를 사용하며 비로그인 시 로그인 안내를 표시한다. 빈 목록, 로딩, 오프라인 대기, 오류와 재시도 화면을 제공한다.
 - 상세에서 찜을 변경하면 기존 `favorites` 캐시 무효화가 목록에도 적용된다.
 - 현재는 전체 찜 기록을 불러온다. 페이지네이션은 포함하지 않았다.
+
+상품 묶음의 크기는 [Firestore 쿼리 제한](https://firebase.google.com/docs/firestore/query-data/queries#query_limitations)에 맞췄다.
 
 ## 상품 상세 화면
 
@@ -64,8 +66,18 @@ npm run build
 npm run test:unit
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore "npx playwright test tests/e2e/favorites.spec.ts"
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore "node --test tests/integration/*.test.mjs"
+npm run test:e2e
 ```
 
-통합 테스트는 실제 API와 로컬 Auth·Firestore 에뮬레이터를 사용한다. 운영 환경 적용에는 `firestore.rules` 배포가 필요하며, 이 단계에서는 배포하지 않는다.
+2026-09-26 로컬 검증 결과:
+
+- `npm run check`, `npm run build` 통과
+- 단위 테스트 24개, 통합 테스트 12개 통과
+- 전체 E2E 20개 통과. 이 중 찜 E2E는 9개이며 재시도 없이 통과했다.
+- 찜 저장·취소·새로고침, 목록 왕복 이동, 저장 거부 후 복구, 오프라인 대기, 계정 전환, 삭제 상품 제외, 목록 오류 후 복구를 검증했다.
+- 실제 API로 31개 찜의 분할 조회와 최신순 정렬을 검증했다.
+- 상세와 목록의 모바일 390px 화면을 확인했다.
+
+통합 테스트는 실제 API와 로컬 Auth·Firestore 에뮬레이터를 사용한다. 운영 환경 적용에는 앱과 `firestore.rules` 배포가 필요하다. 이번 작업은 로컬 구현·검증·커밋까지이며 원격 푸시와 운영 배포는 하지 않았다.
 
 트랜잭션 및 함께 저장되는 데이터 검증은 [Firebase 공식 문서](https://firebase.google.com/docs/firestore/manage-data/transactions)를 따른다.
