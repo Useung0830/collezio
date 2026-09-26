@@ -212,3 +212,57 @@ test("오프라인 요청은 중복 클릭을 막고 연결 복구 후 저장한
   await expect(page.getByText("찜 1", { exact: true })).toBeVisible();
   await expect(button).toBeEnabled();
 });
+
+test("비로그인 찜 목록은 목업 대신 로그인 안내를 표시한다", async ({
+  page,
+}) => {
+  await page.goto("/favorites");
+  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
+  await expect(
+    favorites.getByText("로그인하면 찜한 상품을 확인할 수 있습니다."),
+  ).toBeVisible();
+  await expect(favorites.getByRole("heading", { level: 3 })).toHaveCount(0);
+  await expect(favorites.getByRole("link", { name: "로그인" })).toHaveAttribute(
+    "href",
+    "/login",
+  );
+});
+
+test("상세에서 찜한 상품을 목록에서 열고 취소 후 뒤로 가면 목록에서 사라진다", async ({
+  page,
+  request,
+  productId,
+}) => {
+  await login(page, request);
+  await page.goto("/favorites");
+  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
+  await expect(favorites.getByText("아직 찜한 상품이 없습니다.")).toBeVisible();
+  await page.goto(`/products/${productId}`);
+  const button = page.getByRole("button", { name: "찜", exact: true });
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await expect(button).toBeEnabled();
+  await page.goto("/favorites");
+  await expect(favorites.getByRole("heading", { level: 2 })).toHaveText(
+    "찜한 컬렉션1",
+  );
+  await expect(favorites.getByRole("heading", { level: 3 })).toHaveText([
+    "찜 테스트 상품",
+  ]);
+  await page.reload();
+  await expect(favorites.getByRole("heading", { level: 3 })).toHaveText([
+    "찜 테스트 상품",
+  ]);
+  await favorites.getByRole("link").click();
+  await expect(page).toHaveURL(new RegExp(`/products/${productId}$`));
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "false");
+  await expect(button).toBeEnabled();
+  await page.goBack();
+  await expect(favorites.getByText("아직 찜한 상품이 없습니다.")).toBeVisible();
+  await expect(favorites.getByRole("heading", { level: 2 })).toHaveText(
+    "찜한 컬렉션0",
+  );
+});
