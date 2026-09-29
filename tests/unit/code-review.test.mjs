@@ -101,6 +101,33 @@ test("새 커밋이 올라오면 이전 커밋의 결과 게시를 거부한다"
   assert.equal(published.length, 0);
 });
 
+test("영어로만 작성된 요약이나 지적은 GitHub에 게시하지 않는다", async () => {
+  for (const rawReview of [
+    JSON.stringify({
+      complete: true,
+      summary: "Review complete",
+      findings: [],
+    }),
+    serializeReview([{ ...finding, body: "[P2] Handle the failed request." }]),
+  ]) {
+    const { github, published } = createGithub();
+    await assert.rejects(
+      publishCodeReview({ ...request, github, rawReview }),
+      /한국어 설명/,
+    );
+    assert.equal(published.length, 0);
+  }
+  assert.equal(
+    parseCodeReview(
+      serializeReview([
+        { ...finding, body: "[P2] fetch 실패 시 오류를 표시하세요." },
+      ]),
+      files,
+    ).comments.length,
+    1,
+  );
+});
+
 test("동일 커밋 재실행 시 봇의 완료 리뷰를 중복 게시하지 않는다", async () => {
   const { github, published } = createGithub({
     reviews: [
