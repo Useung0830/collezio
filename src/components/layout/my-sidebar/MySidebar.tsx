@@ -7,10 +7,7 @@ import Button from "@/components/common/button/Button";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
 
-const exchangeMenus = [
-  { label: "보유품 목록", href: "/collections" },
-  { label: "매칭 내역", href: "/matches" },
-];
+const exchangeMenus = [{ label: "보유품 목록", href: "/collections" }];
 
 const userMenus = [
   { label: "찜한 컬렉션", href: "/favorites" },
