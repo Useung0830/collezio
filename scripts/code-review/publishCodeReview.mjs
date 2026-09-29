@@ -40,6 +40,9 @@ export function parseCodeReview(rawReview, files) {
   ) {
     throw new Error("리뷰가 완료되지 않았거나 결과 형식이 올바르지 않습니다.");
   }
+  if (!/[가-힣]/u.test(review.summary)) {
+    throw new Error("리뷰 요약에 한국어 설명이 없어 게시를 중단합니다.");
+  }
 
   const changedFiles = new Map(
     files.map((file) => [file.filename, getDiffLines(file.patch)]),
@@ -57,6 +60,11 @@ export function parseCodeReview(rawReview, files) {
     ) {
       throw new Error(
         `리뷰 지적의 위치 또는 내용이 올바르지 않습니다: ${finding?.path}:${finding?.line} (${finding?.side})`,
+      );
+    }
+    if (!/[가-힣]/u.test(finding.body)) {
+      throw new Error(
+        `리뷰 지적에 한국어 설명이 없어 게시를 중단합니다: ${finding.path}:${finding.line}`,
       );
     }
     return {
