@@ -233,6 +233,22 @@ test("커뮤니티 사진 API·Storage·Firestore 규칙", async (t) => {
         }
       },
     );
+    await t.test(
+      "통합된 상품 이미지 규칙도 본인 업로드·삭제를 유지한다",
+      async () => {
+        const own = ref(
+          firebaseStorage,
+          `products/${user.uid}/${crypto.randomUUID()}`,
+        );
+        await uploadBytes(own, file);
+        assert.equal((await getMetadata(own)).size, file.size);
+        await assert.rejects(
+          uploadBytes(ref(firebaseStorage, "products/other/image"), file),
+          denied,
+        );
+        await deleteObject(own);
+      },
+    );
     await t.test("비로그인 업로드 차단", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(

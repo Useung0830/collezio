@@ -7,24 +7,24 @@ import {
   where,
 } from "firebase/firestore";
 
-import { validateFavoriteUser } from "@/features/favorite/utils/validateFavoriteUser";
 import type { ProductListItem } from "@/features/products/types/product";
 import { parseProductListItem } from "@/features/products/utils/parseProduct";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
 
 const FAVORITE_PRODUCT_BATCH_SIZE = 30;
 
 export async function getFavoriteProducts(userId: string) {
   await firebaseAuth.authStateReady();
-  validateFavoriteUser(userId);
+  validateFirebaseUser(userId);
   const favorites = await getDocsFromServer(
     query(
       collection(firebaseDb, "users", userId, "favorites"),
       orderBy("createdAt", "desc"),
     ),
   );
-  validateFavoriteUser(userId);
+  validateFirebaseUser(userId);
 
   const products = new Map<string, ProductListItem>();
   // Firestore in 쿼리의 항목 제한에 맞춰 상품을 묶어서 조회합니다.
@@ -42,7 +42,7 @@ export async function getFavoriteProducts(userId: string) {
         where(documentId(), "in", productIds),
       ),
     );
-    validateFavoriteUser(userId);
+    validateFirebaseUser(userId);
     for (const product of snapshot.docs) {
       products.set(
         product.id,

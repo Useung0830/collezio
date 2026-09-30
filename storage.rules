@@ -1,6 +1,5 @@
 rules_version = '2';
 
-// 커뮤니티 에뮬레이터용 규칙입니다. 운영 배포 전 기존 Storage 규칙에 병합해야 합니다.
 service firebase.storage {
   match /b/{bucket}/o {
     match /community/{userId}/{postId}/{imageId} {
@@ -16,6 +15,25 @@ service firebase.storage {
         && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
       allow delete: if isOwner() && isUnpublished();
+    }
+    match /products/{userId}/{fileName} {
+      function isOwner() {
+        return request.auth != null
+          && request.auth.uid == userId;
+      }
+
+      allow get: if true;
+
+      allow create: if isOwner()
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in [
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ];
+
+      allow delete: if isOwner();
     }
   }
 }
