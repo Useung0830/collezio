@@ -58,4 +58,28 @@ npm run test:e2e
 
 통합 테스트와 브라우저 테스트는 별도의 새 에뮬레이터에서 실행한다. 브라우저 테스트가 데모 프로젝트 설정으로 프로덕션 빌드를 생성한다. 실제 배포 빌드는 대상 환경 설정으로 다시 생성해야 한다.
 
-실제 Firebase 적용에는 `firestore.rules`, `firestore.indexes.json`, `storage.rules`가 필요하다. 공유 규칙 파일에는 채팅·상품 권한도 포함되어 있으므로 배포 시 통합된 최신 파일을 사용한다. 이 단계의 검증은 로컬 에뮬레이터 기준이며 운영 규칙이나 인덱스를 배포하지 않았다.
+실제 Firebase 적용에는 `firestore.rules`, `firestore.indexes.json`, `storage.rules`가 필요하다. 공유 규칙 파일에는 채팅·상품 권한도 포함되어 있으므로 배포 시 통합된 최신 파일을 사용한다.
+
+Storage 규칙은 Firestore 문서로 게시글 소유권과 삭제 상태를 확인한다. 최초 적용 시 Firebase Storage 서비스 계정(`service-PROJECT_NUMBER@gcp-sa-firebasestorage.iam.gserviceaccount.com`)에 `roles/firebaserules.firestoreServiceAgent` 역할이 필요하다. Firebase CLI의 `--non-interactive` 배포는 이 권한 확인·설정을 건너뛰므로, 규칙 배포 성공만으로 사진 기능이 준비됐다고 판단하지 않는다. 권한 변경은 프로젝트 관리자의 승인을 받고 적용하며 전파 후 실제 사진 업로드와 삭제를 확인한다. [Firebase 교차 서비스 규칙 권한 안내](https://firebase.google.com/docs/rules/manage-deploy)
+
+2026-09-30에 `collezio-e3a8d` 프로젝트로 Firestore 규칙·인덱스와 Storage 규칙을 배포했다. 기존 채팅·상품 규칙을 보존했으며, 승인받은 Storage 서비스 계정의 Firestore 조회 역할을 적용했다.
+
+### 실제 Firebase 브라우저 검증 (2026-09-30)
+
+Edge에서 로컬 앱(`localhost:3001`)을 실제 Firebase에 연결하고, 별도 테스트 계정 2개로 직접 조작했다.
+
+- 비로그인 글쓰기 제한, 공백 제목 오류, 오류 시 입력 유지, SVG 첨부 차단
+- 사진 없는 글 및 PNG를 첨부한 새 글 등록, 목록·상세 이동, 썸네일과 원본 사진 표시
+- 작성자 본문 수정, 사진 추가·교체, 수정 취소 시 원문 유지
+- 본인 글 좋아요 차단, 타인 글 좋아요 등록·취소, 새로고침 후 상태 유지
+- 댓글 등록·수정·삭제, 수정 표시, 작성 후 5분 경과 시 수정 차단
+- 타인 게시글과 댓글의 수정·삭제 버튼 숨김
+- 내 게시글·댓글 목록, 원문 이동, 계정 전환 시 사용자별 목록 분리
+- 게시글 삭제 취소·확인, 목록 복귀, 관련 댓글·좋아요·사진과 삭제 작업 기록의 서버 정리
+- 삭제된 게시글 주소 재접근 시 안내 표시
+
+검증에 사용한 게시글 2개와 관련 데이터·사진은 삭제 후 서버 잔여 건수 0을 확인했다. 임시 테스트 계정 2개도 정리했다.
+
+파일 배치와 이름은 `src/features/community`의 `api`, `components`, `hooks`, `queries`, `types`, `utils` 구분 및 얇은 라우트 원칙에 맞았다. 재배치가 필요한 필수 컨벤션 위반은 발견하지 못했고 `npm run check`가 통과했다. 이번 변경은 배포 안내와 검증 기록이며 기능 코드는 변경하지 않았다.
+
+대량 데이터 페이지네이션, 동시 수정 충돌, 중간 연결 끊김과 삭제 복구 등의 경계 조건은 기존 자동 테스트 범위다. 이번 실제 프로젝트 수동 검증에서 해당 장애를 모두 재현하지는 않았다.
