@@ -9,6 +9,21 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maximum
         && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
     }
+    function canCleanCommunityPost(postId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == request.auth.uid;
+    }
+    match /communityPostDeletions/{postId} {
+      allow get: if request.auth != null && (!exists(/databases/$(database)/documents/communityPostDeletions/$(postId)) || isCommunityOwner(resource.data.authorId));
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && request.resource.data.keys().hasAll(['authorId', 'images', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['authorId', 'images', 'createdAt'])
+        && request.resource.data.authorId == get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId
+        && request.resource.data.images == get(/databases/$(database)/documents/communityPosts/$(postId)).data.images
+        && request.resource.data.createdAt == request.time
+        && !existsAfter(/databases/$(database)/documents/communityPosts/$(postId));
+      allow delete: if isCommunityOwner(resource.data.authorId);
+    }
     match /communityPosts/{postId} {
       function isValidCommunityImage(image, authorId) {
         return image.keys().hasOnly(['path', 'url'])
@@ -46,6 +61,7 @@ service cloud.firestore {
       }
       allow read: if true;
       allow create: if isCommunityOwner(request.resource.data.authorId)
+        && !exists(/databases/$(database)/documents/communityPostDeletions/$(postId))
         && isValidPost(request.resource.data)
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time
@@ -54,11 +70,12 @@ service cloud.firestore {
       allow update: if request.auth != null && (
         (isCommunityOwner(resource.data.authorId)
           && isValidPost(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'updatedAt'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'images', 'updatedAt'])
           && request.resource.data.updatedAt == request.time)
         || isLikeChange());
-      // 댓글·이미지 정리를 포함한 게시글 삭제는 4단계에서 추가합니다.
-      allow delete: if false;
+      allow delete: if isCommunityOwner(resource.data.authorId)
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == resource.data.authorId
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.images == resource.data.images;
 
       match /likes/{userId} {
         function hasCountChange(delta) {
@@ -66,11 +83,12 @@ service cloud.firestore {
           return getAfter(path).data.likeCount == get(path).data.likeCount + delta;
         }
         allow get: if isCommunityOwner(userId);
+        allow list: if canCleanCommunityPost(postId);
         allow create: if isCommunityOwner(userId)
           && request.resource.data.keys().hasAll(['createdAt'])
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt == request.time && hasCountChange(1);
-        allow delete: if isCommunityOwner(userId) && hasCountChange(-1);
+        allow delete: if (isCommunityOwner(userId) && hasCountChange(-1)) || canCleanCommunityPost(postId);
       }
     }
     match /communityComments/{commentId} {
@@ -80,7 +98,7 @@ service cloud.firestore {
           && data.postId is string && data.postId.size() > 0
           && !data.postId.matches('.*[/].*')
           && isCommunityText(data.content, 1000)
-          && exists(/databases/$(database)/documents/communityPosts/$(data.postId));
+          && existsAfter(/databases/$(database)/documents/communityPosts/$(data.postId));
       }
       allow read: if true;
       allow create: if isCommunityOwner(request.resource.data.authorId)
@@ -91,7 +109,7 @@ service cloud.firestore {
         && isValidComment(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
         && request.resource.data.updatedAt == request.time;
-      allow delete: if isCommunityOwner(resource.data.authorId);
+      allow delete: if isCommunityOwner(resource.data.authorId) || canCleanCommunityPost(resource.data.postId);
     }
     match /users/{userId}/productChats/{productId} {
       function isOwner() {

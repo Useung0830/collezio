@@ -11,6 +11,7 @@ export type CommunityPostDocument = {
   images: CommunityImage[];
   createdAt: string;
   updatedAt: string;
+  version: string;
   likeCount: number;
   viewCount: number;
 };

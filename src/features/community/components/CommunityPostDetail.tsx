@@ -1,8 +1,14 @@
 "use client";
+import { useState } from "react";
 import Image from "next/image";
 
 import Button from "@/components/common/button/Button";
+import CommunityDeletionRecovery from "@/features/community/components/CommunityDeletionRecovery";
+import DeleteCommunityPostDialog from "@/features/community/components/DeleteCommunityPostDialog";
+import EditCommunityPostForm from "@/features/community/components/EditCommunityPostForm";
+import { useCommunityAuthorId } from "@/features/community/hooks/useCommunityAuthorId";
 import { useCommunityPostQuery } from "@/features/community/hooks/useCommunityPostQuery";
+import type { CommunityPostDocument } from "@/features/community/types/communityDocument";
 import { formatCommunityDate } from "@/features/community/utils/formatCommunityDate";
 import { getCommunityImageUrl } from "@/features/community/utils/getCommunityImageUrl";
 type CommunityPostDetailProps = { postId: string };
@@ -10,6 +16,12 @@ export default function CommunityPostDetail({
   postId,
 }: CommunityPostDetailProps) {
   const postQuery = useCommunityPostQuery(postId);
+  const userId = useCommunityAuthorId();
+  const [editingPost, setEditingPost] = useState<CommunityPostDocument | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [notice, setNotice] = useState("");
   if (postQuery.isPending)
     return (
       <p role="status" className="text-body-16 text-black-900">
@@ -18,7 +30,7 @@ export default function CommunityPostDetail({
           : "게시글을 불러오고 있습니다."}
       </p>
     );
-  if (postQuery.isError)
+  if (postQuery.isError && !postQuery.data)
     return (
       <div className="text-black-900">
         <p role="alert" className="text-body-16 mb-3">
@@ -35,12 +47,61 @@ export default function CommunityPostDetail({
   const post = postQuery.data;
   if (!post)
     return (
-      <p role="status" className="text-body-16 text-black-900">
-        존재하지 않거나 삭제된 게시글입니다.
-      </p>
+      <div>
+        <p role="status" className="text-body-16 text-black-900">
+          존재하지 않거나 삭제된 게시글입니다.
+        </p>
+        {userId && (
+          <CommunityDeletionRecovery
+            key={userId}
+            postId={postId}
+            userId={userId}
+          />
+        )}
+      </div>
+    );
+  if (editingPost && editingPost.authorId === userId)
+    return (
+      <EditCommunityPostForm
+        post={editingPost}
+        onCancel={() => setEditingPost(null)}
+        onSaved={(isCleaned) => {
+          setEditingPost(null);
+          setNotice(
+            isCleaned
+              ? "게시글을 수정했습니다."
+              : "게시글은 수정했지만 제거한 사진 파일 일부를 정리하지 못했습니다.",
+          );
+        }}
+      />
     );
   return (
     <article>
+      {notice && (
+        <p role="status" className="text-body-14 text-black-900 mb-4">
+          {notice}
+        </p>
+      )}
+      {userId === post.authorId && (
+        <div className="mb-4 flex justify-end gap-3">
+          <Button
+            onClick={() => {
+              setNotice("");
+              setEditingPost(post);
+            }}
+          >
+            수정
+          </Button>
+          <Button onClick={() => setIsDeleting(true)}>삭제</Button>
+        </div>
+      )}
+      {isDeleting && userId === post.authorId && (
+        <DeleteCommunityPostDialog
+          postId={postId}
+          userId={userId}
+          onClose={() => setIsDeleting(false)}
+        />
+      )}
       <header className="border-black-200 border-b pb-6">
         <h1 className="text-heading-24 text-black-900 break-words">
           {post.title}

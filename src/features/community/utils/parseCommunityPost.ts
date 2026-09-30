@@ -41,6 +41,7 @@ export function parseCommunityPost(
     images: parseCommunityImages(data.images, data.authorId, id),
     createdAt: data.createdAt.toDate().toISOString(),
     updatedAt: data.updatedAt.toDate().toISOString(),
+    version: `${data.updatedAt.seconds}:${data.updatedAt.nanoseconds}`,
     likeCount: data.likeCount,
     viewCount: data.viewCount,
   };
