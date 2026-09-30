@@ -2,6 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isCommunityOwner(authorId) {
+      return request.auth != null && request.auth.uid == authorId;
+    }
+    function isCommunityText(value, maximum) {
+      return value is string && value.size() > 0 && value.size() <= maximum
+        && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+    match /communityPosts/{postId} {
+      function isValidPost(data) {
+        return data.keys().hasAll(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && data.keys().hasOnly(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && isCommunityText(data.title, 100) && isCommunityText(data.content, 5000)
+          // 이미지 업로드 및 Storage 소유권 검증은 사진 연결 단계에서 추가합니다.
+          && data.images is list && data.images.size() == 0;
+      }
+      function isLikeChange() {
+        let path = /databases/$(database)/documents/communityPosts/$(postId)/likes/$(request.auth.uid);
+        let before = resource.data.likeCount;
+        let after = request.resource.data.likeCount;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+          && after is int && after >= 0 && after <= 9007199254740991
+          && ((!exists(path) && existsAfter(path) && after == before + 1)
+            || (exists(path) && !existsAfter(path) && after == before - 1));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && isValidPost(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.likeCount is int && request.resource.data.likeCount == 0
+        && request.resource.data.viewCount is int && request.resource.data.viewCount == 0;
+      allow update: if request.auth != null && (
+        (isCommunityOwner(resource.data.authorId)
+          && isValidPost(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time)
+        || isLikeChange());
+      // 댓글·이미지 정리를 포함한 게시글 삭제는 4단계에서 추가합니다.
+      allow delete: if false;
+
+      match /likes/{userId} {
+        function hasCountChange(delta) {
+          let path = /databases/$(database)/documents/communityPosts/$(postId);
+          return getAfter(path).data.likeCount == get(path).data.likeCount + delta;
+        }
+        allow get: if isCommunityOwner(userId);
+        allow create: if isCommunityOwner(userId)
+          && request.resource.data.keys().hasAll(['createdAt'])
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time && hasCountChange(1);
+        allow delete: if isCommunityOwner(userId) && hasCountChange(-1);
+      }
+    }
+    match /communityComments/{commentId} {
+      function isValidComment(data) {
+        return data.keys().hasAll(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.postId is string && data.postId.size() > 0
+          && !data.postId.matches('.*[/].*')
+          && isCommunityText(data.content, 1000)
+          && exists(/databases/$(database)/documents/communityPosts/$(data.postId));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && isValidComment(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isCommunityOwner(resource.data.authorId)
+        && isValidComment(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isCommunityOwner(resource.data.authorId);
+    }
     match /profiles/{userId} {
       allow get: if true;
       allow create: if request.auth != null
