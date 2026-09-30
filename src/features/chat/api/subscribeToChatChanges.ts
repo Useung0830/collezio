@@ -1,8 +1,8 @@
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 
-import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import type { ChatSubscriptionScope } from "@/features/chat/types/chatSubscription";
 
-export type ChatSubscriptionScope = "list" | "detail" | "messages";
+import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 
 export function subscribeToChatChanges(
   userId: string,

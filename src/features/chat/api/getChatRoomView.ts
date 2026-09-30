@@ -2,22 +2,23 @@ import type {
   ChatRoomView,
   RegisteredChatRoom,
 } from "@/features/chat/types/registeredChatRoom";
-import { validateChatUser } from "@/features/chat/utils/validateChatUser";
 import { getRegisteredProduct } from "@/features/products/api/getRegisteredProduct";
 import { getPublicProfile } from "@/features/user/api/getPublicProfile";
+
+import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
 
 export async function getChatRoomView(
   room: RegisteredChatRoom,
   userId: string,
 ): Promise<ChatRoomView> {
-  validateChatUser(userId);
+  validateFirebaseUser(userId);
   const partnerId =
     room.requesterId === userId ? room.sellerId : room.requesterId;
   const [product, profile] = await Promise.all([
     getRegisteredProduct(room.productId, userId),
     getPublicProfile(partnerId),
   ]);
-  validateChatUser(userId);
+  validateFirebaseUser(userId);
   return {
     ...room,
     partnerName: profile?.nickname ?? "프로필 없는 사용자",

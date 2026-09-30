@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import type { ChatSubscriptionScope } from "@/features/chat/api/subscribeToChatChanges";
 import { subscribeToChatChanges } from "@/features/chat/api/subscribeToChatChanges";
 import { chatQueryKeys } from "@/features/chat/queries/chatQueryKeys";
+import type { ChatSubscriptionScope } from "@/features/chat/types/chatSubscription";
 
 export function useChatSubscription(
   userId: string | null | undefined,

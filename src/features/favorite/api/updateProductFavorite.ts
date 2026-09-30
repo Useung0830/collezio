@@ -6,9 +6,8 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import { validateFavoriteUser } from "@/features/favorite/utils/validateFavoriteUser";
-
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
 
 interface UpdateProductFavoriteInput {
   productId: string;
@@ -24,17 +23,17 @@ export async function updateProductFavorite({
   isFavorite,
 }: UpdateProductFavoriteInput) {
   await firebaseAuth.authStateReady();
-  validateFavoriteUser(userId);
+  validateFirebaseUser(userId);
 
   const productRef = doc(firebaseDb, "products", productId);
   const favoriteRef = doc(firebaseDb, "users", userId, "favorites", productId);
   let lastReadState: { favoriteCount: number; isFavorite: boolean } | undefined;
   const commitFavorite = () =>
     runTransaction(firebaseDb, async (transaction) => {
-      validateFavoriteUser(userId);
+      validateFirebaseUser(userId);
       const product = await transaction.get(productRef);
       const favorite = await transaction.get(favoriteRef);
-      validateFavoriteUser(userId);
+      validateFirebaseUser(userId);
 
       if (!product.exists()) {
         throw new Error("상품을 찾을 수 없습니다.");
@@ -75,7 +74,7 @@ export async function updateProductFavorite({
   for (let attempt = 1; ; attempt += 1) {
     try {
       const result = await commitFavorite();
-      validateFavoriteUser(userId);
+      validateFirebaseUser(userId);
       return result;
     } catch (error) {
       if (
@@ -89,12 +88,12 @@ export async function updateProductFavorite({
 
       // 동시 커밋은 충돌 응답보다 먼저 규칙 검사에서 거부될 수 있습니다.
       // 읽었던 상태가 실제로 바뀐 경우에만 새 트랜잭션으로 재시도합니다.
-      validateFavoriteUser(userId);
+      validateFirebaseUser(userId);
       const [product, favorite] = await Promise.all([
         getDocFromServer(productRef),
         getDocFromServer(favoriteRef),
       ]);
-      validateFavoriteUser(userId);
+      validateFirebaseUser(userId);
       if (
         product.exists() &&
         (product.data().favoriteCount ?? 0) === lastReadState.favoriteCount &&

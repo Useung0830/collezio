@@ -8,9 +8,9 @@ import {
 } from "firebase/firestore";
 
 import { validateChatDocumentId } from "@/features/chat/utils/validateChatDocumentId";
-import { validateChatUser } from "@/features/chat/utils/validateChatUser";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
 
 interface CreateChatRoomInput {
   productId: string;
@@ -24,7 +24,7 @@ export async function createChatRoom({
   validateChatDocumentId(productId);
   validateChatDocumentId(userId);
   await firebaseAuth.authStateReady();
-  validateChatUser(userId);
+  validateFirebaseUser(userId);
 
   const productRef = doc(firebaseDb, "products", productId);
   const linkRef = doc(firebaseDb, "users", userId, "productChats", productId);
@@ -44,11 +44,11 @@ export async function createChatRoom({
 
   try {
     const roomId = await runTransaction(firebaseDb, async (transaction) => {
-      validateChatUser(userId);
+      validateFirebaseUser(userId);
       const link = await transaction.get(linkRef);
       if (link.exists()) return getLinkedRoomId(link.data());
       const product = await transaction.get(productRef);
-      validateChatUser(userId);
+      validateFirebaseUser(userId);
       const sellerId: unknown = product.data()?.sellerId;
       if (!product.exists() || typeof sellerId !== "string") {
         throw new Error("상품 또는 판매자 정보를 확인할 수 없습니다.");
@@ -70,7 +70,7 @@ export async function createChatRoom({
       });
       return roomRef.id;
     });
-    validateChatUser(userId);
+    validateFirebaseUser(userId);
     return roomId;
   } catch (error) {
     // 다른 탭이 먼저 생성하면 규칙 검사가 트랜잭션 재시도보다 먼저 거부할 수 있습니다.
@@ -80,9 +80,9 @@ export async function createChatRoom({
     ) {
       throw error;
     }
-    validateChatUser(userId);
+    validateFirebaseUser(userId);
     const link = await getDocFromServer(linkRef);
-    validateChatUser(userId);
+    validateFirebaseUser(userId);
     if (!link.exists()) throw error;
     return getLinkedRoomId(link.data());
   }

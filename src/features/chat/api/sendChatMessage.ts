@@ -11,9 +11,9 @@ import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
 import { parseChatMessage } from "@/features/chat/utils/parseChatMessage";
 import { parseChatRoom } from "@/features/chat/utils/parseChatRoom";
 import { validateChatDocumentId } from "@/features/chat/utils/validateChatDocumentId";
-import { validateChatUser } from "@/features/chat/utils/validateChatUser";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
 
 const MAX_SEND_ATTEMPTS = 3;
 
@@ -28,7 +28,7 @@ export async function sendChatMessage({
   if (!text || text.length > MAX_CHAT_MESSAGE_LENGTH || messageId.length > 128)
     throw new Error("메시지는 1~2,000자로 입력해주세요.");
   await firebaseAuth.authStateReady();
-  validateChatUser(userId);
+  validateFirebaseUser(userId);
   const roomRef = doc(firebaseDb, "chatRooms", roomId);
   const messageRef = doc(roomRef, "messages", messageId);
   let observed:
@@ -44,10 +44,10 @@ export async function sendChatMessage({
       const productId = await runTransaction(
         firebaseDb,
         async (transaction) => {
-          validateChatUser(userId);
+          validateFirebaseUser(userId);
           const roomSnapshot = await transaction.get(roomRef);
           const messageSnapshot = await transaction.get(messageRef);
-          validateChatUser(userId);
+          validateFirebaseUser(userId);
           if (!roomSnapshot.exists())
             throw new Error("채팅방을 찾을 수 없습니다.");
           const room = parseChatRoom(roomId, roomSnapshot.data());
@@ -73,7 +73,7 @@ export async function sendChatMessage({
             if (room.requesterId !== userId)
               throw new Error("첫 메시지는 대화 신청자만 보낼 수 있습니다.");
             const product = await transaction.get(productRef);
-            validateChatUser(userId);
+            validateFirebaseUser(userId);
             if (!product.exists() || product.data().sellerId !== room.sellerId)
               throw new Error(
                 "상품 정보를 확인할 수 없어 대화를 시작할 수 없습니다.",
@@ -103,7 +103,7 @@ export async function sendChatMessage({
           return room.productId;
         },
       );
-      validateChatUser(userId);
+      validateFirebaseUser(userId);
       return { roomId, messageId, productId };
     } catch (error) {
       if (
@@ -113,9 +113,9 @@ export async function sendChatMessage({
         attempt >= MAX_SEND_ATTEMPTS
       )
         throw error;
-      validateChatUser(userId);
+      validateFirebaseUser(userId);
       const latestRoom = await getDocFromServer(roomRef);
-      validateChatUser(userId);
+      validateFirebaseUser(userId);
       if (!latestRoom.exists()) throw error;
       const latest = parseChatRoom(roomId, latestRoom.data());
       if ((latest.lastMessage?.id ?? null) !== observed.lastMessageId) continue;
@@ -123,7 +123,7 @@ export async function sendChatMessage({
         const product = await getDocFromServer(
           doc(firebaseDb, "products", observed.productId),
         );
-        validateChatUser(userId);
+        validateFirebaseUser(userId);
         if (
           product.exists() &&
           (product.data().chatCount ?? 0) !== observed.chatCount
