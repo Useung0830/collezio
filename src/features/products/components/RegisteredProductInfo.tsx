@@ -98,6 +98,7 @@ export default function RegisteredProductInfo({
         <RegisteredProductActions
           key={product.id}
           productId={product.id}
+          sellerId={product.sellerId}
           transactionType={product.transaction.type}
           favoriteCount={product.favoriteCount}
           chatCount={product.chatCount}

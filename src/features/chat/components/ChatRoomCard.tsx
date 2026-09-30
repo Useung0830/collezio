@@ -1,66 +1,52 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import type { ChatRoom } from "@/features/chat/types/chatRoom";
+import type { ChatRoomView } from "@/features/chat/types/registeredChatRoom";
+import ProfileAvatar from "@/features/user/components/ProfileAvatar";
 
-import ExchangeIcon from "@/assets/icons/icon-exchange.svg";
+import formatRelativeTime from "@/utils/formatRelativeTime";
 
-type ChatRoomCardProps = {
-  chatRoom: ChatRoom;
-};
+type ChatRoomCardProps = { chatRoom: ChatRoomView };
 
 export default function ChatRoomCard({ chatRoom }: ChatRoomCardProps) {
   return (
     <li>
       <Link
-        href={`/chat/${chatRoom.id}`}
+        href={`/chat/${encodeURIComponent(chatRoom.id)}`}
         className="hover:bg-black-50 flex min-w-0 items-center gap-3 rounded-2xl px-2 py-3 transition-colors sm:gap-4"
       >
-        <Image
-          src={chatRoom.partnerImage}
-          alt={`${chatRoom.partnerName} 프로필`}
-          width={64}
-          height={64}
-          className="size-14 shrink-0 rounded-full object-cover sm:size-16"
+        <ProfileAvatar
+          imageUrl={chatRoom.partnerImageUrl}
+          nickname={chatRoom.partnerName}
         />
-
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-label-16 text-black-900 truncate">
               {chatRoom.partnerName}
             </h2>
-            <time className="text-caption-12 text-black-500 shrink-0">
-              {chatRoom.lastMessageAt}
+            <time
+              className="text-caption-12 text-black-500 shrink-0"
+              dateTime={chatRoom.createdAt}
+            >
+              {formatRelativeTime(chatRoom.createdAt)}
             </time>
           </div>
-          <p className="text-body-14 text-black-700 mt-1 truncate">
-            {chatRoom.lastMessage}
+          <p className="text-body-14 text-black-900 mt-1 truncate">
+            {chatRoom.productTitle}
+          </p>
+          <p className="text-body-14 text-black-600 mt-1">
+            아직 보낸 메시지가 없습니다.
           </p>
         </div>
-
-        <div className="flex shrink-0 items-center">
-          {chatRoom.offeredProductImage && (
-            <>
-              <Image
-                src={chatRoom.offeredProductImage}
-                alt="내 교환 상품"
-                width={56}
-                height={56}
-                className="size-12 rounded-xl object-cover sm:size-14"
-              />
-              <span className="border-black-200 z-10 -mx-1.5 flex size-6 items-center justify-center rounded-full border bg-white">
-                <ExchangeIcon className="size-3.5" aria-hidden="true" />
-              </span>
-            </>
-          )}
+        {chatRoom.productImageUrl && (
           <Image
-            src={chatRoom.productImage}
-            alt="채팅 상품"
+            src={chatRoom.productImageUrl}
+            alt={chatRoom.productTitle}
             width={56}
             height={56}
-            className="size-12 rounded-xl object-cover sm:size-14"
+            className="size-14 shrink-0 rounded-xl object-cover"
           />
-        </div>
+        )}
       </Link>
     </li>
   );

@@ -5,6 +5,7 @@ import { useState } from "react";
 import Button from "@/components/common/button/Button";
 import LinkButton from "@/components/common/button/LinkButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
+import StartChatButton from "@/features/chat/components/StartChatButton";
 import { useProductFavoriteQuery } from "@/features/favorite/hooks/useProductFavoriteQuery";
 import { useUpdateProductFavoriteMutation } from "@/features/favorite/hooks/useUpdateProductFavoriteMutation";
 import type { ProductTransaction } from "@/features/products/types/product";
@@ -14,6 +15,7 @@ import HeartOutlineIcon from "@/assets/icons/icon-heart-outline.svg";
 
 interface RegisteredProductActionsProps {
   productId: string;
+  sellerId: string | null;
   transactionType: ProductTransaction["type"];
   favoriteCount: number;
   chatCount: number;
@@ -21,6 +23,7 @@ interface RegisteredProductActionsProps {
 
 export default function RegisteredProductActions({
   productId,
+  sellerId,
   transactionType,
   favoriteCount,
   chatCount,
@@ -28,7 +31,6 @@ export default function RegisteredProductActions({
   const favoriteQuery = useProductFavoriteQuery(productId);
   const favoriteMutation = useUpdateProductFavoriteMutation();
   const [isLoginRequired, setIsLoginRequired] = useState(false);
-  const isSale = transactionType === "sale";
   const isFavorite = favoriteQuery.isLoggedIn && favoriteQuery.data === true;
   const isDisabled =
     favoriteQuery.isAuthLoading ||
@@ -56,7 +58,7 @@ export default function RegisteredProductActions({
         <span aria-hidden="true">·</span>
         <span>채팅 {chatCount}</span>
       </div>
-      <div className="text-label-16 flex justify-between gap-4">
+      <div className="text-label-16 flex items-start justify-between gap-4">
         <ToggleButton
           isPressed={isFavorite}
           size="lg"
@@ -73,17 +75,11 @@ export default function RegisteredProductActions({
           )}
           <span className="whitespace-nowrap">찜</span>
         </ToggleButton>
-        <Button
-          variant={isSale ? "blue" : "green"}
-          size="lg"
-          shape="rounded"
-          className="min-w-0 flex-1 whitespace-nowrap"
-          disabled
-          title="준비 중"
-          aria-label={`${isSale ? "판매하기" : "교환하기"} (준비 중)`}
-        >
-          {isSale ? "판매하기" : "교환하기"}
-        </Button>
+        <StartChatButton
+          productId={productId}
+          sellerId={sellerId}
+          transactionType={transactionType}
+        />
       </div>
       {isLoginRequired && !favoriteQuery.isLoggedIn && (
         <div className="text-body-16 text-black-900 flex flex-wrap items-center gap-3">

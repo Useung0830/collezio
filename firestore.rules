@@ -2,6 +2,45 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{userId}/productChats/{productId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function isValidLink() {
+        let data = request.resource.data;
+        let roomPath = /databases/$(database)/documents/chatRooms/$(data.roomId);
+        let room = getAfter(roomPath).data;
+        return data.keys().hasAll(['roomId']) && data.keys().hasOnly(['roomId'])
+          && data.roomId is string && data.roomId.matches('^[A-Za-z0-9]{20}$')
+          && !exists(roomPath)
+          && room.requesterId == userId && room.productId == productId;
+      }
+      allow get: if isOwner();
+      allow create: if isOwner() && isValidLink();
+    }
+
+    match /chatRooms/{roomId} {
+      function isValidDraft() {
+        let data = request.resource.data;
+        let productPath = /databases/$(database)/documents/products/$(data.productId);
+        let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(data.productId);
+        return data.keys().hasAll(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && data.keys().hasOnly(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && roomId.matches('^[A-Za-z0-9]{20}$')
+          && data.productId is string && data.productId.size() > 0 && data.productId.size() <= 1500
+          && data.productId.matches('^[^/]+$')
+          && data.requesterId == request.auth.uid
+          && data.sellerId is string && data.sellerId != request.auth.uid
+          && data.sellerId == get(productPath).data.sellerId
+          && data.status == 'draft' && data.visibleTo == [request.auth.uid]
+          && data.createdAt == request.time
+          && !exists(linkPath) && getAfter(linkPath).data.roomId == roomId;
+      }
+      // 상대방은 첫 메시지 전송 전에는 목록뿐 아니라 직접 조회도 할 수 없습니다.
+      allow read: if request.auth != null && request.auth.uid in resource.data.visibleTo;
+      allow create: if request.auth != null && isValidDraft();
+    }
+
     match /profiles/{userId} {
       allow get: if true;
       allow create: if request.auth != null
