@@ -2,6 +2,97 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /users/{userId}/productChats/{productId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function isValidLink() {
+        let data = request.resource.data;
+        let roomPath = /databases/$(database)/documents/chatRooms/$(data.roomId);
+        let room = getAfter(roomPath).data;
+        return data.keys().hasAll(['roomId']) && data.keys().hasOnly(['roomId'])
+          && data.roomId is string && data.roomId.matches('^[A-Za-z0-9]{20}$')
+          && !exists(roomPath)
+          && room.requesterId == userId && room.productId == productId;
+      }
+      allow get: if isOwner();
+      allow create: if isOwner() && isValidLink();
+    }
+
+    match /chatRooms/{roomId} {
+      function isValidMessage(data) {
+        return data.keys().hasAll(['content', 'senderId', 'createdAt'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt'])
+          && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
+          && data.content.matches('(?s).*\\S.*')
+          && data.senderId == request.auth.uid && data.createdAt == request.time;
+      }
+      function hasNewMessage() {
+        let summary = request.resource.data.lastMessage;
+        let messagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(summary.id);
+        let message = getAfter(messagePath).data;
+        return summary.keys().hasAll(['id', 'content', 'senderId', 'createdAt'])
+          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt'])
+          && summary.id is string && summary.id.size() > 0 && summary.id.size() <= 128
+          && !exists(messagePath) && isValidMessage(message)
+          && summary.content == message.content && summary.senderId == message.senderId
+          && summary.createdAt == message.createdAt;
+      }
+      function hasChatCountIncrement() {
+        let productPath = /databases/$(database)/documents/products/$(resource.data.productId);
+        let before = get(productPath).data.get('chatCount', 0);
+        let after = getAfter(productPath).data.chatCount;
+        return before is int && before >= 0 && after is int && after == before + 1
+          && after <= 9007199254740991;
+      }
+      function isValidMessageUpdate() {
+        return request.auth.uid in resource.data.visibleTo
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'visibleTo', 'lastMessage'])
+          && request.resource.data.status == 'active'
+          && request.resource.data.visibleTo == [resource.data.requesterId, resource.data.sellerId]
+          && hasNewMessage()
+          && ((resource.data.status == 'draft' && request.auth.uid == resource.data.requesterId && hasChatCountIncrement())
+            || resource.data.status == 'active');
+      }
+      function isValidDraft() {
+        let data = request.resource.data;
+        let productPath = /databases/$(database)/documents/products/$(data.productId);
+        let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(data.productId);
+        return data.keys().hasAll(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && data.keys().hasOnly(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && roomId.matches('^[A-Za-z0-9]{20}$')
+          && data.productId is string && data.productId.size() > 0 && data.productId.size() <= 1500
+          && data.productId.matches('^[^/]+$')
+          && data.requesterId == request.auth.uid
+          && data.sellerId is string && data.sellerId != request.auth.uid
+          && data.sellerId == get(productPath).data.sellerId
+          && data.status == 'draft' && data.visibleTo == [request.auth.uid]
+          && data.createdAt == request.time
+          && !exists(linkPath) && getAfter(linkPath).data.roomId == roomId;
+      }
+      // 상대방은 첫 메시지 전송 전에는 목록뿐 아니라 직접 조회도 할 수 없습니다.
+      allow read: if request.auth != null && request.auth.uid in resource.data.visibleTo;
+      allow create: if request.auth != null && isValidDraft();
+      allow update: if request.auth != null && isValidMessageUpdate();
+
+      match /messages/{messageId} {
+        function canAccessRoom() {
+          return request.auth != null
+            && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.visibleTo;
+        }
+        function matchesRoomSummary() {
+          let room = getAfter(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+          let data = request.resource.data;
+          return room.status == 'active' && room.lastMessage.id == messageId
+            && room.lastMessage.content == data.content && room.lastMessage.senderId == data.senderId
+            && room.lastMessage.createdAt == data.createdAt;
+        }
+        allow read: if canAccessRoom();
+        allow create: if canAccessRoom() && messageId.size() > 0 && messageId.size() <= 128
+          && isValidMessage(request.resource.data) && matchesRoomSummary();
+      }
+    }
+
     match /profiles/{userId} {
       allow get: if true;
       allow create: if request.auth != null
@@ -38,6 +129,19 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
+      function isValidChatCountChange() {
+        let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(productId);
+        let roomPath = /databases/$(database)/documents/chatRooms/$(get(linkPath).data.roomId);
+        let roomBefore = get(roomPath).data;
+        let roomAfter = getAfter(roomPath).data;
+        let before = resource.data.get('chatCount', 0);
+        let after = request.resource.data.chatCount;
+        return roomBefore.productId == productId && roomBefore.requesterId == request.auth.uid
+          && roomBefore.sellerId == resource.data.sellerId
+          && roomBefore.status == 'draft' && roomAfter.status == 'active'
+          && before is int && before >= 0 && after is int && after == before + 1
+          && after <= 9007199254740991;
+      }
       function isValidFavoriteChange() {
         let favoritePath = /databases/$(database)/documents/users/$(request.auth.uid)/favorites/$(productId);
         let before = resource.data.get('favoriteCount', 0);
@@ -93,7 +197,9 @@ service cloud.firestore {
           && isValidImageAt(images, 8) && isValidImageAt(images, 9);
       }
       allow read: if true;
-      allow update: if request.auth != null && isValidFavoriteChange();
+      allow update: if request.auth != null
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange()));
       allow create: if request.auth != null
         && isValidProductFields(request.resource.data)
         && request.resource.data.sellerId == request.auth.uid
