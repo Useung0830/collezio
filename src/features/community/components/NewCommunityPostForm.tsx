@@ -5,8 +5,15 @@ import { useRouter } from "next/navigation";
 import Button from "@/components/common/button/Button";
 import IconButton from "@/components/common/button/IconButton";
 import LinkButton from "@/components/common/button/LinkButton";
+import ImageUploader from "@/components/common/ImageUploader";
 import { useCommunityAuthorId } from "@/features/community/hooks/useCommunityAuthorId";
 import { useCreateCommunityPostMutation } from "@/features/community/hooks/useCreateCommunityPostMutation";
+import { CommunityPostSaveError } from "@/features/community/utils/communityPostSaveError";
+import {
+  COMMUNITY_IMAGE_TYPES,
+  MAX_COMMUNITY_IMAGE_COUNT,
+  validateCommunityImages,
+} from "@/features/community/utils/validateCommunityImages";
 import { validateCommunityPost } from "@/features/community/utils/validateCommunityPost";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
@@ -16,6 +23,7 @@ export default function NewCommunityPostForm() {
   const mutation = useCreateCommunityPostMutation();
   const isSubmitting = useRef(false);
   const [error, setError] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const isBusy = mutation.isPending || mutation.isSuccess;
   const handleSubmit = async (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -23,6 +31,7 @@ export default function NewCommunityPostForm() {
     const formData = new FormData(event.currentTarget);
     let input;
     try {
+      validateCommunityImages(files);
       input = validateCommunityPost({
         title: String(formData.get("title") ?? ""),
         content: String(formData.get("content") ?? ""),
@@ -36,12 +45,14 @@ export default function NewCommunityPostForm() {
     isSubmitting.current = true;
     setError("");
     try {
-      const postId = await mutation.mutateAsync(input);
+      const postId = await mutation.mutateAsync({ ...input, files });
       router.replace(`/community/${postId}`);
-    } catch {
+    } catch (error) {
       isSubmitting.current = false;
       setError(
-        "게시글을 저장하지 못했습니다. 로그인과 연결 상태를 확인한 뒤 다시 시도해주세요.",
+        error instanceof CommunityPostSaveError
+          ? error.message
+          : "게시글을 저장하지 못했습니다. 로그인과 연결 상태를 확인한 뒤 다시 시도해주세요.",
       );
     }
   };
@@ -94,9 +105,19 @@ export default function NewCommunityPostForm() {
             aria-label="게시글 내용"
             className="text-body-16 placeholder:text-black-500 mt-2 min-h-80 w-full flex-1 resize-none outline-none"
           />
-          <p className="text-body-14 text-black-600 mt-6">
-            사진 첨부 기능은 준비 중입니다.
-          </p>
+          <div className="mt-6">
+            <ImageUploader
+              triggerVariant="text"
+              maxImageCount={MAX_COMMUNITY_IMAGE_COUNT}
+              disabled={isBusy}
+              accept={COMMUNITY_IMAGE_TYPES.join(",")}
+              validateFiles={validateCommunityImages}
+              onFilesChange={setFiles}
+            />
+            <p className="text-caption-12 text-black-600 mt-2">
+              JPG, PNG, WebP · 장당 5MB 이하 · 최대 10장
+            </p>
+          </div>
           {error && (
             <p role="alert" className="text-body-14 mt-4">
               {error}

@@ -2,6 +2,8 @@ import { Timestamp } from "firebase/firestore";
 
 import type { CommunityPostDocument } from "@/features/community/types/communityDocument";
 
+import { parseCommunityImages } from "./parseCommunityImages";
+
 export function parseCommunityPost(
   id: string,
   value: unknown,
@@ -27,9 +29,7 @@ export function parseCommunityPost(
     data.likeCount < 0 ||
     typeof data.viewCount !== "number" ||
     !Number.isSafeInteger(data.viewCount) ||
-    data.viewCount < 0 ||
-    !Array.isArray(data.images) ||
-    data.images.length !== 0
+    data.viewCount < 0
   ) {
     throw new Error("게시글 정보를 확인할 수 없습니다.");
   }
@@ -38,7 +38,7 @@ export function parseCommunityPost(
     authorId: data.authorId,
     title: data.title,
     content: data.content,
-    images: [],
+    images: parseCommunityImages(data.images, data.authorId, id),
     createdAt: data.createdAt.toDate().toISOString(),
     updatedAt: data.updatedAt.toDate().toISOString(),
     likeCount: data.likeCount,

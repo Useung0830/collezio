@@ -1,10 +1,26 @@
 import assert from "node:assert/strict";
+import { registerHooks } from "node:module";
 import test from "node:test";
 
 import { Timestamp } from "firebase/firestore";
 
-import { parseCommunityPost } from "../../src/features/community/utils/parseCommunityPost.ts";
 import { validateCommunityPost } from "../../src/features/community/utils/validateCommunityPost.ts";
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === "./parseCommunityImages")
+      return nextResolve(
+        new URL(
+          "../../src/features/community/utils/parseCommunityImages.ts",
+          import.meta.url,
+        ).href,
+        context,
+      );
+    return nextResolve(specifier, context);
+  },
+});
+const { parseCommunityPost } =
+  await import("../../src/features/community/utils/parseCommunityPost.ts");
 
 test("게시글 입력은 공백을 정리하고 제목·본문 길이를 제한한다", () => {
   assert.deepEqual(
@@ -52,8 +68,11 @@ test("Firestore 데이터는 검증 후 문자열 ID와 ISO 시간으로 변환�
     { ...data, viewCount: 0.5 },
     { ...data, authorId: "" },
     { ...data, title: " " },
-    { ...data, images: ["invalid"] },
   ]) {
     assert.throws(() => parseCommunityPost("id", invalid));
   }
+  assert.deepEqual(
+    parseCommunityPost("id", { ...data, images: ["invalid"] }).images,
+    [],
+  );
 });

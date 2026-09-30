@@ -1,7 +1,10 @@
 "use client";
+import Image from "next/image";
+
 import Button from "@/components/common/button/Button";
 import { useCommunityPostQuery } from "@/features/community/hooks/useCommunityPostQuery";
 import { formatCommunityDate } from "@/features/community/utils/formatCommunityDate";
+import { getCommunityImageUrl } from "@/features/community/utils/getCommunityImageUrl";
 type CommunityPostDetailProps = { postId: string };
 export default function CommunityPostDetail({
   postId,
@@ -49,6 +52,24 @@ export default function CommunityPostDetail({
         </p>
       </header>
       <div className="min-h-60 py-8">
+        {post.images.length > 0 && (
+          <div className="mb-6 grid gap-4 lg:max-w-120">
+            {post.images.map((image, index) => (
+              <div key={image.path} className="relative aspect-square w-full">
+                <Image
+                  src={getCommunityImageUrl(image.url)}
+                  alt={`${post.title} 게시물 이미지 ${index + 1}`}
+                  fill
+                  sizes="(min-width: 1024px) 480px, 100vw"
+                  unoptimized={
+                    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true"
+                  }
+                  className="rounded-2xl object-contain"
+                />
+              </div>
+            ))}
+          </div>
+        )}
         <p className="text-body-16-relaxed text-black-900 break-words whitespace-pre-line">
           {post.content}
         </p>

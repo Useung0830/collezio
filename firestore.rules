@@ -10,12 +10,30 @@ service cloud.firestore {
         && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
     }
     match /communityPosts/{postId} {
+      function isValidCommunityImage(image, authorId) {
+        return image.keys().hasOnly(['path', 'url'])
+          && image.path.matches('community/' + authorId + '/' + postId + '/[a-zA-Z0-9-]{1,64}')
+          && image.url.size() <= 2048
+          && image.url.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[a-zA-Z0-9.-]+/o/'
+            + image.path.replace('/', '%2F') + '[?]alt=media(&token=[a-zA-Z0-9-]+)?');
+      }
+      function isValidCommunityImageAt(images, index, authorId) {
+        return images.size() <= index || isValidCommunityImage(images[index], authorId);
+      }
+      function isValidCommunityImages(images, authorId) {
+        return images is list && images.size() <= 10
+          && authorId.matches('[a-zA-Z0-9_-]{1,128}') && postId.matches('[a-zA-Z0-9_-]{1,128}')
+          && isValidCommunityImageAt(images, 0, authorId) && isValidCommunityImageAt(images, 1, authorId)
+          && isValidCommunityImageAt(images, 2, authorId) && isValidCommunityImageAt(images, 3, authorId)
+          && isValidCommunityImageAt(images, 4, authorId) && isValidCommunityImageAt(images, 5, authorId)
+          && isValidCommunityImageAt(images, 6, authorId) && isValidCommunityImageAt(images, 7, authorId)
+          && isValidCommunityImageAt(images, 8, authorId) && isValidCommunityImageAt(images, 9, authorId);
+      }
       function isValidPost(data) {
         return data.keys().hasAll(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
           && data.keys().hasOnly(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
           && isCommunityText(data.title, 100) && isCommunityText(data.content, 5000)
-          // 이미지 업로드 및 Storage 소유권 검증은 사진 연결 단계에서 추가합니다.
-          && data.images is list && data.images.size() == 0;
+          && isValidCommunityImages(data.images, data.authorId);
       }
       function isLikeChange() {
         let path = /databases/$(database)/documents/communityPosts/$(postId)/likes/$(request.auth.uid);

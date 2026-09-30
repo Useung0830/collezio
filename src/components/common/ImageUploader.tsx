@@ -11,6 +11,9 @@ type ImageUploaderProps = {
   showRepresentativeLabel?: boolean;
   triggerVariant?: "text" | "tile";
   onFilesChange?: (files: File[]) => void;
+  disabled?: boolean;
+  accept?: string;
+  validateFiles?: (files: File[]) => void;
 };
 
 type UploadedImage = {
@@ -25,8 +28,12 @@ export default function ImageUploader({
   showRepresentativeLabel = false,
   triggerVariant = "tile",
   onFilesChange,
+  disabled = false,
+  accept = "image/*",
+  validateFiles,
 }: ImageUploaderProps) {
   const [images, setImages] = useState<UploadedImage[]>([]);
+  const [error, setError] = useState("");
   const imageUrls = useRef(new Set<string>());
 
   useEffect(() => {
@@ -38,8 +45,18 @@ export default function ImageUploader({
   }, []);
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const selectedFiles = Array.from(event.target.files ?? []);
     const availableCount = maxImageCount - images.length;
+
+    try {
+      validateFiles?.([...images.map((image) => image.file), ...selectedFiles]);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "사진을 확인해주세요.");
+      event.target.value = "";
+      return;
+    }
+    setError("");
 
     const newImages = selectedFiles.slice(0, availableCount).map((file) => {
       const url = URL.createObjectURL(file);
@@ -62,6 +79,8 @@ export default function ImageUploader({
   };
 
   const handleImageRemove = (imageId: string) => {
+    if (disabled) return;
+    setError("");
     const removedImage = images.find((image) => image.id === imageId);
 
     if (removedImage) {
@@ -78,7 +97,7 @@ export default function ImageUploader({
   const isTextTrigger = triggerVariant === "text";
 
   return (
-    <fieldset className="min-w-0">
+    <fieldset className="min-w-0" disabled={disabled}>
       <legend className="sr-only">사진 등록</legend>
       <div className="flex gap-3 overflow-x-auto pt-1 pr-1">
         <label
@@ -102,10 +121,11 @@ export default function ImageUploader({
           )}
           <input
             type="file"
-            accept="image/*"
+            accept={accept}
+            aria-label="사진 첨부"
             multiple
             className="sr-only"
-            disabled={images.length >= maxImageCount}
+            disabled={disabled || images.length >= maxImageCount}
             onChange={handleImageUpload}
           />
         </label>
@@ -141,6 +161,11 @@ export default function ImageUploader({
           </div>
         ))}
       </div>
+      {error && (
+        <p role="alert" className="text-body-14 text-black-900 mt-3">
+          {error}
+        </p>
+      )}
     </fieldset>
   );
 }

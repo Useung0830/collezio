@@ -3,7 +3,6 @@ export type CommunityImage = {
   path: string;
 };
 
-// 화면의 샘플 타입은 실제 조회 연결 단계에서 이 타입으로 교체합니다.
 export type CommunityPostDocument = {
   id: string;
   authorId: string;
@@ -33,4 +32,5 @@ export type CommunityLikeDocument = {
 export type CreateCommunityPostInput = {
   title: string;
   content: string;
+  files?: File[];
 };

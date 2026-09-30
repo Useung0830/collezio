@@ -160,3 +160,134 @@ test("상세 조회 실패를 표시하고 다시 시도할 수 있다", async (
     page.getByText("존재하지 않거나 삭제된 게시글입니다."),
   ).toBeVisible();
 });
+
+test("사진 첨부: 제한·미리보기·삭제·업로드 실패 재시도·저장 후 조회", async ({
+  page,
+  request,
+}) => {
+  const email = `${randomUUID()}@example.com`;
+  const password = "Test1234!";
+  const account = await request.post(
+    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key",
+    { data: { email, password, returnSecureToken: true } },
+  );
+  expect(account.ok()).toBeTruthy();
+  await page.goto("/login");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  await page.goto("/community/new");
+  const fileInput = page.getByLabel("사진 첨부", { exact: true });
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf1sAAAAASUVORK5CYII=",
+    "base64",
+  );
+  const photo = { name: "photo.png", mimeType: "image/png", buffer: png };
+  await fileInput.setInputFiles(
+    Array.from({ length: 11 }, (_, index) => ({
+      ...photo,
+      name: `photo-${index}.png`,
+    })),
+  );
+  await expect(
+    page.getByRole("alert").filter({ hasText: "최대 10장" }),
+  ).toBeVisible();
+  await fileInput.setInputFiles({
+    name: "invalid.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from("<svg/>"),
+  });
+  await expect(
+    page.getByRole("alert").filter({ hasText: "JPG, PNG, WebP" }),
+  ).toBeVisible();
+  await fileInput.setInputFiles({
+    ...photo,
+    buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
+  });
+  await expect(
+    page.getByRole("alert").filter({ hasText: "5MB 이하" }),
+  ).toBeVisible();
+  await fileInput.setInputFiles([photo, { ...photo, name: "remove.png" }]);
+  await expect(
+    page.getByRole("img", { name: "photo.png", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "remove.png 삭제" }).click();
+  await expect(
+    page.getByRole("img", { name: "remove.png", exact: true }),
+  ).toHaveCount(0);
+  const title = `사진 게시글 ${randomUUID()}`;
+  await page.getByLabel("게시글 제목").fill(title);
+  await page.getByLabel("게시글 내용").fill("사진 본문");
+  await page.route("http://127.0.0.1:9199/**", (route) => {
+    if (route.request().method() === "POST")
+      return route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: { code: 403, message: "Permission denied" },
+        }),
+      });
+    return route.continue();
+  });
+  await page.getByRole("button", { name: "작성 완료" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "게시글을 저장하지 못했습니다" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("게시글 제목")).toHaveValue(title);
+  await expect(
+    page.getByRole("img", { name: "photo.png", exact: true }),
+  ).toBeVisible();
+  await page.unroute("http://127.0.0.1:9199/**");
+  let postId: string | undefined;
+  try {
+    await page.getByRole("button", { name: "작성 완료" }).click();
+    await expect(page).toHaveURL(/\/community\/(?!new$)[^/]+$/);
+    postId = new URL(page.url()).pathname.split("/").at(-1);
+    const image = page.getByRole("img", {
+      name: `${title} 게시물 이미지 1`,
+      exact: true,
+    });
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    await page.reload();
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    await page.getByRole("link", { name: "게시글 목록", exact: true }).click();
+    const thumbnail = page.getByRole("img", {
+      name: `${title} 썸네일`,
+      exact: true,
+    });
+    await expect(thumbnail).toBeVisible();
+    await expect
+      .poll(() =>
+        thumbnail.evaluate((element: HTMLImageElement) => element.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+  } finally {
+    if (postId) {
+      const stored = await request.get(`${documentsUrl}/${postId}`, {
+        headers: { Authorization: "Bearer owner" },
+      });
+      const data = await stored.json();
+      for (const image of data.fields.images.arrayValue.values ?? []) {
+        const path = image.mapValue.fields.path.stringValue;
+        await request.delete(
+          `http://127.0.0.1:9199/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(path)}`,
+          { headers: { Authorization: "Bearer owner" } },
+        );
+      }
+      await request.delete(`${documentsUrl}/${postId}`, {
+        headers: { Authorization: "Bearer owner" },
+      });
+    }
+  }
+});
