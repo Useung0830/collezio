@@ -23,6 +23,7 @@ export type CommunityCommentDocument = {
   content: string;
   createdAt: string;
   updatedAt: string;
+  version: string;
 };
 
 export type CommunityLikeDocument = {

@@ -85,6 +85,7 @@ service cloud.firestore {
         allow get: if isCommunityOwner(userId);
         allow list: if canCleanCommunityPost(postId);
         allow create: if isCommunityOwner(userId)
+          && get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId != userId
           && request.resource.data.keys().hasAll(['createdAt'])
           && request.resource.data.keys().hasOnly(['createdAt'])
           && request.resource.data.createdAt == request.time && hasCountChange(1);
@@ -106,6 +107,7 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt == request.time;
       allow update: if isCommunityOwner(resource.data.authorId)
+        && request.time < resource.data.createdAt + duration.value(5, 'm')
         && isValidComment(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
         && request.resource.data.updatedAt == request.time;

@@ -4,6 +4,7 @@ import Image from "next/image";
 
 import Button from "@/components/common/button/Button";
 import CommunityDeletionRecovery from "@/features/community/components/CommunityDeletionRecovery";
+import CommunityPostEngagement from "@/features/community/components/CommunityPostEngagement";
 import DeleteCommunityPostDialog from "@/features/community/components/DeleteCommunityPostDialog";
 import EditCommunityPostForm from "@/features/community/components/EditCommunityPostForm";
 import { useCommunityAuthorId } from "@/features/community/hooks/useCommunityAuthorId";
@@ -135,9 +136,7 @@ export default function CommunityPostDetail({
           {post.content}
         </p>
       </div>
-      <p className="text-body-14 text-black-600 border-black-200 border-t pt-6">
-        댓글과 좋아요 기능은 준비 중입니다.
-      </p>
+      <CommunityPostEngagement post={post} />
     </article>
   );
 }

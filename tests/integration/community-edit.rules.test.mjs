@@ -357,6 +357,158 @@ test("커뮤니티 수정·삭제 API와 권한 및 실패 복구", async (t) =>
         await deleteCommunityPost({ postId, userId: user.uid });
       },
     );
+    await t.test(
+      "댓글 멱등 등록·페이지 조회·수정 충돌·5분 제한과 좋아요 중복 방지",
+      async () => {
+        const { writeCommunityComment } =
+          await import("../../src/features/community/api/writeCommunityComment.ts");
+        const { getCommunityComments } =
+          await import("../../src/features/community/api/getCommunityComments.ts");
+        const { setCommunityLike } =
+          await import("../../src/features/community/api/setCommunityLike.ts");
+        const { getCommunityLike } =
+          await import("../../src/features/community/api/getCommunityLike.ts");
+        const postId = await makePost([]);
+        await assert.rejects(
+          setCommunityLike({ postId, userId: user.uid, isLiked: true }),
+          /본인 게시글/,
+        );
+        const ownLike = writeBatch(db);
+        ownLike.set(doc(db, "communityPosts", postId, "likes", user.uid), {
+          createdAt: serverTimestamp(),
+        });
+        ownLike.update(doc(db, "communityPosts", postId), { likeCount: 1 });
+        await assert.rejects(ownLike.commit(), denied);
+        const { user: reader } = await createUserWithEmailAndPassword(
+          auth,
+          `reader-${crypto.randomUUID()}@example.com`,
+          password,
+        );
+        await assert.doesNotReject(
+          () =>
+            Promise.all(
+              Array.from({ length: 3 }, () =>
+                setCommunityLike({ postId, userId: reader.uid, isLiked: true }),
+              ),
+            ),
+          "동시에 같은 좋아요 등록",
+        );
+        assert.equal(await getCommunityLike(postId, reader.uid), true);
+        assert.equal((await getCommunityPost(postId)).likeCount, 1);
+        await Promise.all(
+          Array.from({ length: 3 }, () =>
+            setCommunityLike({ postId, userId: reader.uid, isLiked: false }),
+          ),
+        );
+        assert.equal((await getCommunityPost(postId)).likeCount, 0);
+        const commentId = crypto.randomUUID();
+        const input = {
+          action: "create",
+          commentId,
+          postId,
+          userId: reader.uid,
+          content: "첫 댓글",
+        };
+        await assert.rejects(
+          writeCommunityComment({ ...input, content: " " }),
+          /1~1,000자/,
+        );
+        await Promise.all([
+          writeCommunityComment(input),
+          writeCommunityComment(input),
+        ]);
+        assert.equal((await getCommunityComments(postId)).comments.length, 1);
+        const original = (await getCommunityComments(postId)).comments[0];
+        await writeCommunityComment({
+          ...input,
+          action: "update",
+          content: "수정 댓글",
+          version: original.version,
+        });
+        await assert.rejects(
+          writeCommunityComment({
+            ...input,
+            action: "update",
+            content: "오래된 수정",
+            version: original.version,
+          }),
+          /다른 곳에서 수정/,
+        );
+        const url = `http://${process.env.FIRESTORE_EMULATOR_HOST}/v1/projects/demo-collezio/databases/(default)/documents/communityComments/${commentId}?updateMask.fieldPaths=createdAt`;
+        const old = await fetch(url, {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer owner",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fields: {
+              createdAt: {
+                timestampValue: new Date(Date.now() - 301000).toISOString(),
+              },
+            },
+          }),
+        });
+        assert.equal(old.ok, true);
+        const latest = (await getCommunityComments(postId)).comments[0];
+        await assert.rejects(
+          writeCommunityComment({
+            ...input,
+            action: "update",
+            content: "기간 만료",
+            version: latest.version,
+          }),
+          /5분/,
+        );
+        await assert.rejects(
+          updateDoc(doc(db, "communityComments", commentId), {
+            content: "직접 수정",
+            updatedAt: serverTimestamp(),
+          }),
+          denied,
+        );
+        for (let index = 0; index < 21; index++)
+          await writeCommunityComment({
+            ...input,
+            commentId: crypto.randomUUID(),
+            content: `댓글 ${index}`,
+          });
+        const first = await getCommunityComments(postId);
+        const second = await getCommunityComments(postId, first.nextCursor);
+        assert.equal(first.comments.length, 20);
+        assert.equal(second.comments.length, 2);
+        assert.equal(
+          new Set(
+            [...first.comments, ...second.comments].map(
+              (comment) => comment.id,
+            ),
+          ).size,
+          22,
+        );
+        await signInWithEmailAndPassword(auth, email, password);
+        await assert.rejects(
+          writeCommunityComment({
+            ...input,
+            action: "delete",
+            userId: user.uid,
+          }),
+          /본인 댓글/,
+        );
+        await signInWithEmailAndPassword(auth, reader.email, password);
+        await writeCommunityComment({ ...input, action: "delete" });
+        await writeCommunityComment({ ...input, action: "delete" });
+        await signInWithEmailAndPassword(auth, email, password);
+        await deleteCommunityPost({ postId, userId: user.uid });
+        await assert.rejects(
+          writeCommunityComment({
+            ...input,
+            userId: user.uid,
+            commentId: crypto.randomUUID(),
+          }),
+          /삭제된 게시글/,
+        );
+      },
+    );
   } finally {
     await deleteApp(firebaseApp);
     hooks.deregister();
