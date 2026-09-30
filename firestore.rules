@@ -2,6 +2,117 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isCommunityOwner(authorId) {
+      return request.auth != null && request.auth.uid == authorId;
+    }
+    function isCommunityText(value, maximum) {
+      return value is string && value.size() > 0 && value.size() <= maximum
+        && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+    function canCleanCommunityPost(postId) {
+      return request.auth != null
+        && get(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == request.auth.uid;
+    }
+    match /communityPostDeletions/{postId} {
+      allow get: if request.auth != null && (!exists(/databases/$(database)/documents/communityPostDeletions/$(postId)) || isCommunityOwner(resource.data.authorId));
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && request.resource.data.keys().hasAll(['authorId', 'images', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['authorId', 'images', 'createdAt'])
+        && request.resource.data.authorId == get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId
+        && request.resource.data.images == get(/databases/$(database)/documents/communityPosts/$(postId)).data.images
+        && request.resource.data.createdAt == request.time
+        && !existsAfter(/databases/$(database)/documents/communityPosts/$(postId));
+      allow delete: if isCommunityOwner(resource.data.authorId);
+    }
+    match /communityPosts/{postId} {
+      function isValidCommunityImage(image, authorId) {
+        return image.keys().hasOnly(['path', 'url'])
+          && image.path.matches('community/' + authorId + '/' + postId + '/[a-zA-Z0-9-]{1,64}')
+          && image.url.size() <= 2048
+          && image.url.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[a-zA-Z0-9.-]+/o/'
+            + image.path.replace('/', '%2F') + '[?]alt=media(&token=[a-zA-Z0-9-]+)?');
+      }
+      function isValidCommunityImageAt(images, index, authorId) {
+        return images.size() <= index || isValidCommunityImage(images[index], authorId);
+      }
+      function isValidCommunityImages(images, authorId) {
+        return images is list && images.size() <= 10
+          && authorId.matches('[a-zA-Z0-9_-]{1,128}') && postId.matches('[a-zA-Z0-9_-]{1,128}')
+          && isValidCommunityImageAt(images, 0, authorId) && isValidCommunityImageAt(images, 1, authorId)
+          && isValidCommunityImageAt(images, 2, authorId) && isValidCommunityImageAt(images, 3, authorId)
+          && isValidCommunityImageAt(images, 4, authorId) && isValidCommunityImageAt(images, 5, authorId)
+          && isValidCommunityImageAt(images, 6, authorId) && isValidCommunityImageAt(images, 7, authorId)
+          && isValidCommunityImageAt(images, 8, authorId) && isValidCommunityImageAt(images, 9, authorId);
+      }
+      function isValidPost(data) {
+        return data.keys().hasAll(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && data.keys().hasOnly(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && isCommunityText(data.title, 100) && isCommunityText(data.content, 5000)
+          && isValidCommunityImages(data.images, data.authorId);
+      }
+      function isLikeChange() {
+        let path = /databases/$(database)/documents/communityPosts/$(postId)/likes/$(request.auth.uid);
+        let before = resource.data.likeCount;
+        let after = request.resource.data.likeCount;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+          && after is int && after >= 0 && after <= 9007199254740991
+          && ((!exists(path) && existsAfter(path) && after == before + 1)
+            || (exists(path) && !existsAfter(path) && after == before - 1));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && !exists(/databases/$(database)/documents/communityPostDeletions/$(postId))
+        && isValidPost(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.likeCount is int && request.resource.data.likeCount == 0
+        && request.resource.data.viewCount is int && request.resource.data.viewCount == 0;
+      allow update: if request.auth != null && (
+        (isCommunityOwner(resource.data.authorId)
+          && isValidPost(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'images', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time)
+        || isLikeChange());
+      allow delete: if isCommunityOwner(resource.data.authorId)
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == resource.data.authorId
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.images == resource.data.images;
+
+      match /likes/{userId} {
+        function hasCountChange(delta) {
+          let path = /databases/$(database)/documents/communityPosts/$(postId);
+          return getAfter(path).data.likeCount == get(path).data.likeCount + delta;
+        }
+        allow get: if isCommunityOwner(userId);
+        allow list: if canCleanCommunityPost(postId);
+        allow create: if isCommunityOwner(userId)
+          && get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId != userId
+          && request.resource.data.keys().hasAll(['createdAt'])
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time && hasCountChange(1);
+        allow delete: if (isCommunityOwner(userId) && hasCountChange(-1)) || canCleanCommunityPost(postId);
+      }
+    }
+    match /communityComments/{commentId} {
+      function isValidComment(data) {
+        return data.keys().hasAll(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.postId is string && data.postId.size() > 0
+          && !data.postId.matches('.*[/].*')
+          && isCommunityText(data.content, 1000)
+          && existsAfter(/databases/$(database)/documents/communityPosts/$(data.postId));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && isValidComment(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isCommunityOwner(resource.data.authorId)
+        && request.time < resource.data.createdAt + duration.value(5, 'm')
+        && isValidComment(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isCommunityOwner(resource.data.authorId) || canCleanCommunityPost(resource.data.postId);
+    }
     match /users/{userId}/productChats/{productId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId;

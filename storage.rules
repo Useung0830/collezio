@@ -2,6 +2,31 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    match /community/{userId}/{postId}/{imageId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+      function canUpload() {
+        return !firestore.exists(/databases/(default)/documents/communityPostDeletions/$(postId))
+          && (!firestore.exists(/databases/(default)/documents/communityPosts/$(postId))
+            || firestore.get(/databases/(default)/documents/communityPosts/$(postId)).data.authorId == userId);
+      }
+      function isUnusedAt(images, index) {
+        return images.size() <= index || images[index].path != 'community/' + userId + '/' + postId + '/' + imageId;
+      }
+      function isUnused() {
+        let images = firestore.get(/databases/(default)/documents/communityPosts/$(postId)).data.images;
+        return isUnusedAt(images, 0) && isUnusedAt(images, 1) && isUnusedAt(images, 2)
+          && isUnusedAt(images, 3) && isUnusedAt(images, 4) && isUnusedAt(images, 5)
+          && isUnusedAt(images, 6) && isUnusedAt(images, 7) && isUnusedAt(images, 8) && isUnusedAt(images, 9);
+      }
+      allow get: if true;
+      allow create: if isOwner() && resource == null && canUpload()
+        && imageId.matches('[a-zA-Z0-9-]+')
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+      allow delete: if isOwner() && (!firestore.exists(/databases/(default)/documents/communityPosts/$(postId)) || isUnused());
+    }
     match /products/{userId}/{fileName} {
       function isOwner() {
         return request.auth != null

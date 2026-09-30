@@ -3,7 +3,7 @@ import "client-only";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { connectStorageEmulator, getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -32,5 +32,6 @@ if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   if (typeof window !== "undefined" && !firebaseAuth.emulatorConfig) {
     connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099");
     connectFirestoreEmulator(firebaseDb, "127.0.0.1", 8080);
+    connectStorageEmulator(firebaseStorage, "127.0.0.1", 9199);
   }
 }
