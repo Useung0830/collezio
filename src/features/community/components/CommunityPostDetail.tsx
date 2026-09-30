@@ -111,6 +111,7 @@ export default function CommunityPostDetail({
           <time dateTime={post.createdAt}>
             {formatCommunityDate(post.createdAt)}
           </time>
+          {post.createdAt !== post.updatedAt && " (수정됨)"}
         </p>
       </header>
       <div className="min-h-60 py-8">

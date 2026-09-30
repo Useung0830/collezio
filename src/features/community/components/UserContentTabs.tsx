@@ -27,6 +27,24 @@ export default function UserContentTabs({
             id={`user-content-tab-${tab.value}`}
             aria-controls={`user-content-${tab.value}`}
             aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
+            onKeyDown={(event) => {
+              if (
+                !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)
+              )
+                return;
+              event.preventDefault();
+              const next =
+                event.key === "Home"
+                  ? "posts"
+                  : event.key === "End"
+                    ? "comments"
+                    : activeTab === "posts"
+                      ? "comments"
+                      : "posts";
+              onChange(next);
+              document.getElementById(`user-content-tab-${next}`)?.focus();
+            }}
             className={`text-body-16 relative px-4 pb-3 ${
               isActive ? "text-black-900" : "text-black-600"
             }`}

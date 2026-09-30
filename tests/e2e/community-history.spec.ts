@@ -131,7 +131,11 @@ test("내 글·댓글: 로그인, 빈 목록, 페이지 조회, 삭제 원문 �
     await expect(
       panel.getByRole("heading", { name: "내 목록 반영 수정", exact: true }),
     ).toBeVisible();
-    await page.getByRole("tab", { name: "댓글", exact: true }).click();
+    await page.getByRole("tab", { name: "게시글", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(
+      page.getByRole("tab", { name: "댓글", exact: true }),
+    ).toBeFocused();
     await expect(panel.getByRole("heading", { level: 3 })).toHaveCount(19);
     await expect(panel.getByText("내 댓글 21", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "내 댓글 더보기" }).click();

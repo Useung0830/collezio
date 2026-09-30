@@ -4,6 +4,7 @@ import test from "node:test";
 
 import { Timestamp } from "firebase/firestore";
 
+import { parseCommunityComment } from "../../src/features/community/utils/parseCommunityComment.ts";
 import { validateCommunityPost } from "../../src/features/community/utils/validateCommunityPost.ts";
 
 registerHooks({
@@ -59,6 +60,12 @@ test("Firestore 데이터는 검증 후 문자열 ID와 ISO 시간으로 변환�
   assert.equal(post.id, "document-id");
   assert.equal(post.createdAt, "1970-01-01T00:00:00.000Z");
   assert.equal(post.updatedAt, "1970-01-01T00:00:01.000Z");
+  assert.notEqual(
+    parseCommunityPost("id", { ...data, updatedAt: new Timestamp(1, 1) })
+      .version,
+    parseCommunityPost("id", { ...data, updatedAt: new Timestamp(1, 2) })
+      .version,
+  );
   for (const invalid of [
     null,
     [],
@@ -75,4 +82,27 @@ test("Firestore 데이터는 검증 후 문자열 ID와 ISO 시간으로 변환�
     parseCommunityPost("id", { ...data, images: ["invalid"] }).images,
     [],
   );
+});
+
+test("댓글 원문과 작성자를 검증하고 수정 충돌 검사용 나노초 버전을 보존한다", () => {
+  const data = {
+    authorId: "author",
+    postId: "post",
+    content: "댓글",
+    createdAt: new Timestamp(1, 0),
+    updatedAt: new Timestamp(1, 1),
+  };
+  const comment = parseCommunityComment("id", data);
+  assert.equal(comment.version, "1:1");
+  assert.equal(comment.content, "댓글");
+  for (const invalid of [
+    null,
+    {},
+    { ...data, authorId: "" },
+    { ...data, postId: "post/path" },
+    { ...data, content: " " },
+    { ...data, content: "가".repeat(1001) },
+    { ...data, createdAt: "yesterday" },
+  ])
+    assert.throws(() => parseCommunityComment("id", invalid));
 });

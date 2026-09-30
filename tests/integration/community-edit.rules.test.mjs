@@ -39,7 +39,11 @@ test("커뮤니티 수정·삭제 API와 권한 및 실패 복구", async (t) =>
       if (specifier === "client-only")
         return { url: "data:text/javascript,export {};", shortCircuit: true };
       if (
-        (context.parentURL?.endsWith("/api/updateCommunityPost.ts") &&
+        ([
+          "/api/updateCommunityPost.ts",
+          "/api/writeCommunityComment.ts",
+          "/api/setCommunityLike.ts",
+        ].some((path) => context.parentURL?.endsWith(path)) &&
           specifier === "firebase/firestore") ||
         (context.parentURL?.endsWith("/api/deleteCommunityPost.ts") &&
           specifier === "@/features/community/api/deleteCommunityImages")
@@ -401,6 +405,17 @@ test("커뮤니티 수정·삭제 API와 권한 및 실패 복구", async (t) =>
           ),
         );
         assert.equal((await getCommunityPost(postId)).likeCount, 0);
+        editFaults.failure = "before";
+        await assert.rejects(
+          setCommunityLike({ postId, userId: reader.uid, isLiked: true }),
+        );
+        assert.equal((await getCommunityPost(postId)).likeCount, 0);
+        editFaults.failure = "after";
+        await setCommunityLike({ postId, userId: reader.uid, isLiked: true });
+        assert.equal((await getCommunityPost(postId)).likeCount, 1);
+        await setCommunityLike({ postId, userId: reader.uid, isLiked: false });
+        assert.equal((await getCommunityPost(postId)).likeCount, 0);
+        editFaults.failure = null;
         const commentId = crypto.randomUUID();
         const input = {
           action: "create",
@@ -418,6 +433,16 @@ test("커뮤니티 수정·삭제 API와 권한 및 실패 복구", async (t) =>
           writeCommunityComment(input),
         ]);
         assert.equal((await getCommunityComments(postId)).comments.length, 1);
+        editFaults.failure = "after";
+        const recoveredInput = {
+          ...input,
+          commentId: crypto.randomUUID(),
+          content: "응답 유실 댓글",
+        };
+        await writeCommunityComment(recoveredInput);
+        await writeCommunityComment(recoveredInput);
+        editFaults.failure = null;
+        await writeCommunityComment({ ...recoveredInput, action: "delete" });
         const original = (await getCommunityComments(postId)).comments[0];
         await writeCommunityComment({
           ...input,

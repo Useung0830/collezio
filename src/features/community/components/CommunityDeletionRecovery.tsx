@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { FirebaseError } from "firebase/app";
 
 import Button from "@/components/common/button/Button";
 import { getCommunityDeletion } from "@/features/community/api/getCommunityDeletion";
@@ -20,6 +21,26 @@ export default function CommunityDeletionRecovery({
     retry: false,
   });
   const [isOpen, setIsOpen] = useState(false);
+  if (
+    deletionQuery.isError &&
+    !(
+      deletionQuery.error instanceof FirebaseError &&
+      deletionQuery.error.code === "permission-denied"
+    )
+  )
+    return (
+      <div className="text-black-900 mt-4">
+        <p role="alert" className="text-body-14 mb-3">
+          삭제 정리 상태를 확인하지 못했습니다.
+        </p>
+        <Button
+          disabled={deletionQuery.isFetching}
+          onClick={() => void deletionQuery.refetch()}
+        >
+          삭제 상태 다시 조회
+        </Button>
+      </div>
+    );
   if (!deletionQuery.data) return null;
   return (
     <div className="text-black-900 mt-4">

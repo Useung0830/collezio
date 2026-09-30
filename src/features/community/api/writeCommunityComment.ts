@@ -82,6 +82,7 @@ export async function writeCommunityComment(input: CommentInput) {
       throw error;
     validateFirebaseUser(input.userId);
     const saved = await getDocFromServer(reference);
+    validateFirebaseUser(input.userId);
     if (
       saved.exists() &&
       saved.data().authorId === input.userId &&
