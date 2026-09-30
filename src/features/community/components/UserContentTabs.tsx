@@ -24,6 +24,8 @@ export default function UserContentTabs({
             key={tab.value}
             type="button"
             role="tab"
+            id={`user-content-tab-${tab.value}`}
+            aria-controls={`user-content-${tab.value}`}
             aria-selected={isActive}
             className={`text-body-16 relative px-4 pb-3 ${
               isActive ? "text-black-900" : "text-black-600"
