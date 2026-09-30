@@ -9,6 +9,7 @@ import formatRelativeTime from "@/utils/formatRelativeTime";
 type ChatRoomCardProps = { chatRoom: ChatRoomView };
 
 export default function ChatRoomCard({ chatRoom }: ChatRoomCardProps) {
+  const lastActivityAt = chatRoom.lastMessage?.createdAt ?? chatRoom.createdAt;
   return (
     <li>
       <Link
@@ -26,16 +27,16 @@ export default function ChatRoomCard({ chatRoom }: ChatRoomCardProps) {
             </h2>
             <time
               className="text-caption-12 text-black-500 shrink-0"
-              dateTime={chatRoom.createdAt}
+              dateTime={lastActivityAt}
             >
-              {formatRelativeTime(chatRoom.createdAt)}
+              {formatRelativeTime(lastActivityAt)}
             </time>
           </div>
           <p className="text-body-14 text-black-900 mt-1 truncate">
             {chatRoom.productTitle}
           </p>
-          <p className="text-body-14 text-black-600 mt-1">
-            아직 보낸 메시지가 없습니다.
+          <p className="text-body-14 text-black-600 mt-1 truncate">
+            {chatRoom.lastMessage?.content ?? "아직 보낸 메시지가 없습니다."}
           </p>
         </div>
         {chatRoom.productImageUrl && (

@@ -1,3 +1,4 @@
+import type { ChatMessage } from "@/features/chat/types/chatMessage";
 import type { ProductTransaction } from "@/features/products/types/product";
 
 export interface RegisteredChatRoom {
@@ -5,8 +6,9 @@ export interface RegisteredChatRoom {
   productId: string;
   sellerId: string;
   requesterId: string;
-  status: "draft";
+  status: "draft" | "active";
   createdAt: string;
+  lastMessage: ChatMessage | null;
 }
 
 export interface ChatRoomView extends RegisteredChatRoom {

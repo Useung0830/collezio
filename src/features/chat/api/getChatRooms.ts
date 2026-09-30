@@ -28,6 +28,8 @@ export async function getChatRooms(userId: string) {
   );
   validateChatUser(userId);
   return rooms.sort((first, second) =>
-    second.createdAt.localeCompare(first.createdAt),
+    (second.lastMessage?.createdAt ?? second.createdAt).localeCompare(
+      first.lastMessage?.createdAt ?? first.createdAt,
+    ),
   );
 }

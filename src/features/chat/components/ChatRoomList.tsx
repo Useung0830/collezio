@@ -40,7 +40,7 @@ export default function ChatRoomList() {
         </Button>
       </div>
     );
-  if (!query.data.length)
+  if (!query.data?.length)
     return (
       <p
         role="status"

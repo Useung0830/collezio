@@ -8,6 +8,7 @@ import {
   connectAuthEmulator,
   createUserWithEmailAndPassword,
   getAuth,
+  signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import {
@@ -50,6 +51,10 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     await import("../../src/features/chat/api/getChatRoom.ts");
   const { getChatRooms } =
     await import("../../src/features/chat/api/getChatRooms.ts");
+  const { sendChatMessage } =
+    await import("../../src/features/chat/api/sendChatMessage.ts");
+  const { getChatMessages } =
+    await import("../../src/features/chat/api/getChatMessages.ts");
   const sellerApp = initializeApp(
     { projectId: "demo-collezio", apiKey: "demo-key" },
     "chat-seller",
@@ -267,6 +272,189 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       },
     );
 
+    await t.test(
+      "첫 전송의 일부만 저장하려는 요청은 전체가 취소된다",
+      async () => {
+        const messageId = randomUUID();
+        const batch = writeBatch(firebaseDb);
+        const message = {
+          content: "불완전한 첫 전송",
+          senderId: user.uid,
+          createdAt: serverTimestamp(),
+        };
+        batch.set(
+          doc(firebaseDb, "chatRooms", roomId, "messages", messageId),
+          message,
+        );
+        batch.update(doc(firebaseDb, "chatRooms", roomId), {
+          status: "active",
+          visibleTo: [user.uid, seller.uid],
+          lastMessage: { id: messageId, ...message },
+        });
+        await assert.rejects(batch.commit(), denied);
+        assert.equal((await getChatRoom(roomId, user.uid)).status, "draft");
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 0);
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().chatCount ?? 0,
+          0,
+        );
+        await assert.rejects(
+          getDocFromServer(doc(sellerDb, "chatRooms", roomId)),
+          denied,
+        );
+      },
+    );
+
+    await t.test(
+      "빈 메시지와 너무 긴 메시지는 공개 전환 없이 거부된다",
+      async () => {
+        for (const content of ["  \n ", "a".repeat(2001)]) {
+          await assert.rejects(
+            sendChatMessage({
+              roomId,
+              userId: user.uid,
+              messageId: randomUUID(),
+              content,
+            }),
+            /메시지는/,
+          );
+        }
+        assert.equal((await getChatRoom(roomId, user.uid)).status, "draft");
+      },
+    );
+
+    await t.test(
+      "동시 첫 메시지는 한 번만 공개·집계하고 같은 전송 재시도는 중복되지 않는다",
+      async () => {
+        const requests = Array.from({ length: 3 }, (_, index) => ({
+          roomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: `첫 메시지 ${index}`,
+        }));
+        await Promise.all(requests.map((input) => sendChatMessage(input)));
+        await sendChatMessage(requests[0]);
+        const messages = await getChatMessages(roomId, user.uid);
+        assert.equal(messages.length, 3);
+        assert.equal(new Set(messages.map((message) => message.id)).size, 3);
+        const room = await getChatRoom(roomId, user.uid);
+        assert.equal(room.status, "active");
+        assert.ok(
+          messages.some((message) => message.id === room.lastMessage.id),
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().chatCount,
+          1,
+        );
+        const sellerRooms = await getDocs(
+          query(
+            collection(sellerDb, "chatRooms"),
+            where("visibleTo", "array-contains", seller.uid),
+          ),
+        );
+        assert.equal(sellerRooms.size, 1);
+        assert.equal(
+          (await getDocs(collection(sellerDb, "chatRooms", roomId, "messages")))
+            .size,
+          3,
+        );
+        await assert.rejects(
+          sendChatMessage({ ...requests[0], content: "같은 ID로 내용 변경" }),
+          /일치하지/,
+        );
+      },
+    );
+
+    await t.test(
+      "판매자 답장과 재진입은 같은 방을 사용하고 채팅 수를 유지한다",
+      async () => {
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await sendChatMessage({
+          roomId,
+          userId: seller.uid,
+          messageId: randomUUID(),
+          content: "판매자 답장입니다.",
+        });
+        assert.equal(
+          (await getChatRooms(seller.uid))[0].lastMessage.content,
+          "판매자 답장입니다.",
+        );
+        assert.equal((await getChatMessages(roomId, seller.uid)).length, 4);
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        assert.equal(
+          await createChatRoom({ productId, userId: user.uid }),
+          roomId,
+        );
+        assert.equal(
+          (await getChatMessages(roomId, user.uid)).at(-1).senderId,
+          seller.uid,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().chatCount,
+          1,
+        );
+      },
+    );
+
+    await t.test(
+      "공개된 방도 제삼자 접근·발신자 위조·메시지 수정·카운트 조작을 거부한다",
+      async () => {
+        await assert.rejects(
+          getDocFromServer(doc(strangerDb, "chatRooms", roomId)),
+          denied,
+        );
+        await assert.rejects(
+          getDocs(collection(strangerDb, "chatRooms", roomId, "messages")),
+          denied,
+        );
+        const messages = await getChatMessages(roomId, user.uid);
+        await assert.rejects(
+          updateDoc(
+            doc(firebaseDb, "chatRooms", roomId, "messages", messages[0].id),
+            { content: "수정" },
+          ),
+          denied,
+        );
+        await assert.rejects(
+          updateDoc(doc(firebaseDb, "products", productId), { chatCount: 2 }),
+          denied,
+        );
+        for (const overrides of [
+          { senderId: seller.uid },
+          { content: "  \n " },
+          { content: "a".repeat(2001) },
+        ]) {
+          const messageId = randomUUID();
+          const message = {
+            senderId: user.uid,
+            content: "위조 테스트",
+            createdAt: serverTimestamp(),
+            ...overrides,
+          };
+          const batch = writeBatch(firebaseDb);
+          batch.set(
+            doc(firebaseDb, "chatRooms", roomId, "messages", messageId),
+            message,
+          );
+          batch.update(doc(firebaseDb, "chatRooms", roomId), {
+            lastMessage: { id: messageId, ...message },
+          });
+          await assert.rejects(batch.commit(), denied);
+        }
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 4);
+      },
+    );
+
     await t.test("로그아웃 후 이전 사용자 데이터 요청을 차단한다", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(
@@ -275,6 +463,16 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       );
       await assert.rejects(getChatRooms(user.uid), /로그인 상태/);
       await assert.rejects(getChatRoom(roomId, user.uid), /로그인 상태/);
+      await assert.rejects(getChatMessages(roomId, user.uid), /로그인 상태/);
+      await assert.rejects(
+        sendChatMessage({
+          roomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "로그아웃 후 전송",
+        }),
+        /로그인 상태/,
+      );
       await assert.rejects(
         getDocFromServer(doc(firebaseDb, "chatRooms", roomId)),
         denied,

@@ -117,7 +117,10 @@ test("상품별 채팅방 생성·재진입·내 목록 표시와 판매자 비�
     await expect(
       page.getByText("첫 메시지를 보내면 상대방의 채팅 목록에도 표시됩니다."),
     ).toBeVisible();
-    await expect(page.getByLabel("메시지", { exact: true })).toBeDisabled();
+    await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+    await expect(
+      page.getByRole("button", { name: "메시지 전송", exact: true }),
+    ).toBeDisabled();
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "테스트 판매자", exact: true }),
@@ -178,6 +181,185 @@ test("상품별 채팅방 생성·재진입·내 목록 표시와 판매자 비�
   );
   await expect(page.getByText("아직 시작하지 않은 대화입니다.")).toHaveCount(0);
   await sellerPage.close();
+});
+
+test("첫 전송 이후 상대방 목록에 나타나고 두 계정이 실시간으로 대화한다", async ({
+  page,
+  request,
+  browser,
+  context,
+}) => {
+  const requester = await createAccount(request, "대화 신청자");
+  const seller = await createAccount(request, "대화 판매자");
+  const productId = await createProduct(request, seller.userId, "sale");
+  const sellerContext = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  const blockedRequests: string[] = [];
+  await sellerContext.route(
+    /^https:\/\/(identitytoolkit|securetoken|firestore)\.googleapis\.com\//,
+    async (route) => {
+      blockedRequests.push(route.request().url());
+      await route.abort();
+    },
+  );
+  try {
+    const sellerPage = await sellerContext.newPage();
+    await login(sellerPage, seller);
+    await sellerPage.goto("/chat");
+    await expect(sellerPage.getByText("아직 채팅방이 없습니다.")).toBeVisible();
+    await login(page, requester);
+    await page.goto(`/products/${productId}`);
+    await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+    await expect(page).toHaveURL(/\/chat\/[A-Za-z0-9]{20}$/);
+    const roomUrl = page.url();
+    const input = page.getByLabel("메시지", { exact: true });
+    await expect(input).toBeEnabled();
+    await expect(sellerPage.getByText("아직 채팅방이 없습니다.")).toBeVisible();
+
+    await context.setOffline(true);
+    await input.fill("안녕하세요. 상품 문의드립니다.");
+    await page
+      .getByRole("button", { name: "메시지 전송", exact: true })
+      .click();
+    await expect(
+      page.getByText("인터넷 연결을 기다리고 있습니다. 연결되면 전송됩니다."),
+    ).toBeVisible();
+    await expect(sellerPage.getByText("아직 채팅방이 없습니다.")).toBeVisible();
+    await context.setOffline(false);
+    await expect(
+      page.getByText("안녕하세요. 상품 문의드립니다.", { exact: true }),
+    ).toBeVisible();
+    await expect(input).toHaveValue("");
+    const sellerRoom = sellerPage
+      .getByRole("link")
+      .filter({ hasText: "안녕하세요. 상품 문의드립니다." });
+    await expect(sellerRoom).toBeVisible();
+    await sellerRoom.click();
+    await expect(sellerPage).toHaveURL(roomUrl);
+    await expect(
+      sellerPage.getByRole("heading", { name: "대화 신청자", exact: true }),
+    ).toBeVisible();
+    await expect(
+      sellerPage.getByText("안녕하세요. 상품 문의드립니다.", { exact: true }),
+    ).toBeVisible();
+    await sellerPage
+      .getByLabel("메시지", { exact: true })
+      .fill("네, 문의 가능합니다.");
+    await sellerPage
+      .getByRole("button", { name: "메시지 전송", exact: true })
+      .click();
+    await expect(
+      page.getByText("네, 문의 가능합니다.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel("대화 메시지").getByRole("listitem"),
+    ).toHaveCount(2);
+    await page.reload();
+    await expect(
+      page.getByText("네, 문의 가능합니다.", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: "채팅 목록으로 돌아가기", exact: true })
+      .click();
+    await expect(
+      page.getByText("네, 문의 가능합니다.", { exact: true }),
+    ).toBeVisible();
+    await sellerPage
+      .getByLabel("메시지", { exact: true })
+      .fill("추가 사진은 다음에 보내드릴게요.");
+    await sellerPage
+      .getByRole("button", { name: "메시지 전송", exact: true })
+      .click();
+    await expect(
+      page.getByText("추가 사진은 다음에 보내드릴게요.", { exact: true }),
+    ).toBeVisible();
+    await page.goto(`/products/${productId}`);
+    await expect(page.getByText("채팅 1", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+    await expect(page).toHaveURL(roomUrl);
+    await expect(
+      page.getByLabel("대화 메시지").getByRole("listitem"),
+    ).toHaveCount(3);
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBeTruthy();
+    await page.screenshot({
+      path: "test-results/chat-messages-mobile.png",
+      fullPage: true,
+    });
+    expect(blockedRequests).toEqual([]);
+  } finally {
+    await context.setOffline(false);
+    await sellerContext.close();
+  }
+});
+
+test("첫 전송 실패 시 입력을 보존하고 재시도 후 한 번만 저장한다", async ({
+  page,
+  request,
+}) => {
+  const requester = await createAccount(request, "재시도 신청자");
+  const seller = await createAccount(request, "재시도 판매자");
+  const productId = await createProduct(request, seller.userId, "exchange");
+  const productUrl = `${documentsUrl}/products/${productId}`;
+  const originalProduct = await (
+    await request.get(productUrl, { headers: ownerHeaders })
+  ).json();
+  await login(page, requester);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await expect(page).toHaveURL(/\/chat\/[A-Za-z0-9]{20}$/);
+  const roomId = new URL(page.url()).pathname.split("/").pop();
+  const input = page.getByLabel("메시지", { exact: true });
+  await expect(input).toBeEnabled();
+  expect(
+    (await request.delete(productUrl, { headers: ownerHeaders })).ok(),
+  ).toBeTruthy();
+  await input.fill("교환 가능할까요?");
+  const sendButton = page.getByRole("button", {
+    name: "메시지 전송",
+    exact: true,
+  });
+  await sendButton.click();
+  await expect(
+    page.getByText(
+      "메시지를 보내지 못했습니다. 내용을 확인하고 다시 보내주세요.",
+    ),
+  ).toBeVisible();
+  await expect(input).toHaveValue("교환 가능할까요?");
+  const room = await (
+    await request.get(`${documentsUrl}/chatRooms/${roomId}`, {
+      headers: ownerHeaders,
+    })
+  ).json();
+  expect(room.fields.status.stringValue).toBe("draft");
+  expect(room.fields.visibleTo.arrayValue.values).toEqual([
+    { stringValue: requester.userId },
+  ]);
+  expect(
+    (
+      await request.patch(productUrl, {
+        headers: ownerHeaders,
+        data: { fields: originalProduct.fields },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  await sendButton.click();
+  await expect(
+    page.getByText("교환 가능할까요?", { exact: true }),
+  ).toBeVisible();
+  await expect(input).toHaveValue("");
+  await expect(
+    page.getByLabel("대화 메시지").getByRole("listitem"),
+  ).toHaveCount(1);
+  await page.reload();
+  await expect(
+    page.getByLabel("대화 메시지").getByRole("listitem"),
+  ).toHaveCount(1);
 });
 
 test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({

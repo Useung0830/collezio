@@ -55,7 +55,11 @@ export default function RegisteredChatRoom({
     <div className="mx-auto flex h-[calc(100dvh-7rem)] min-h-100 w-full max-w-184 flex-col overflow-hidden bg-white">
       <ChatRoomHeader chatRoom={query.data} />
       <ChatProductSummary chatRoom={query.data} />
-      <ChatConversation />
+      <ChatConversation
+        key={`${roomId}:${query.userId}`}
+        roomId={roomId}
+        userId={query.userId}
+      />
     </div>
   );
 }
