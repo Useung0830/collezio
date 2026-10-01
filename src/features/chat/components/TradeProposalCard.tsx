@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
+import { respondToTradeProposal } from "@/features/chat/api/respondToTradeProposal";
 import ChatActionDialog from "@/features/chat/components/ChatActionDialog";
 import TradeProposalDetails from "@/features/chat/components/TradeProposalDetails";
 import { useTradeProposals } from "@/features/chat/hooks/useTradeProposals";
@@ -16,7 +18,28 @@ export default function TradeProposalCard({
   proposalId: string;
 }) {
   const query = useTradeProposals(roomId, userId);
+  const client = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+  const handleRespond = async (
+    action: "accepted" | "rejected" | "withdrawn",
+  ) => {
+    if (isPending) return;
+    setIsPending(true);
+    setError("");
+    try {
+      await respondToTradeProposal(roomId, userId, proposalId, action);
+      await client.invalidateQueries({ queryKey: ["chat"] });
+      await client.invalidateQueries({ queryKey: ["products"] });
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "제안을 처리하지 못했습니다.",
+      );
+    } finally {
+      setIsPending(false);
+    }
+  };
   const proposal = query.data?.proposals.find((item) => item.id === proposalId);
   const labels = {
     pending: "응답 대기",
@@ -47,12 +70,51 @@ export default function TradeProposalCard({
           {isOpen && (
             <ChatActionDialog
               title={labels[proposal.status]}
-              isPending={false}
+              isPending={isPending}
               onClose={() => setIsOpen(false)}
             >
               <TradeProposalDetails proposal={proposal} userId={userId} />
+              {error && (
+                <p role="alert" className="mb-3">
+                  {error}
+                </p>
+              )}
+              {proposal.status === "pending" && (
+                <div className="mb-3 flex gap-2">
+                  {proposal.senderId === userId ? (
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => void handleRespond("withdrawn")}
+                      className="flex-1 rounded-lg border p-3 disabled:opacity-50"
+                    >
+                      제안 철회
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => void handleRespond("rejected")}
+                        className="flex-1 rounded-lg border p-3 disabled:opacity-50"
+                      >
+                        거절
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        onClick={() => void handleRespond("accepted")}
+                        className="bg-brand-blue flex-1 rounded-lg p-3 text-white disabled:opacity-50"
+                      >
+                        수락
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
+                disabled={isPending}
                 className="w-full rounded-lg border p-3"
                 onClick={() => setIsOpen(false)}
               >

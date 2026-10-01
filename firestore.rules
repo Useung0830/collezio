@@ -187,8 +187,26 @@ service cloud.firestore {
           && ((t.kind == 'sale' && t.exchangeProductId == null && t.extraAmount == 0 && t.extraPayer == 'none')
             || (t.kind == 'exchange' && t.amount == 0 && t.exchangeProductId is string && t.exchangeProductId.matches('^[a-zA-Z0-9-]{1,128}$')));
       }
+      function reservedAfter(productId) {
+        let product = getAfter(/databases/$(database)/documents/products/$(productId)).data;
+        return product.status == 'reserved' && product.reservedByRoomId == roomId;
+      }
+      function validTradeAcceptance(data) {
+        return request.auth.uid == data.recipientId && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && data.previousId == null && data.terms.scheduledAt > request.time.toMillis()
+          && availableForTrade(data.productId, tradeRoom().sellerId) && reservedAfter(data.productId)
+          && (data.terms.kind == 'sale' || (availableForTrade(data.terms.exchangeProductId, tradeRoom().requesterId) && reservedAfter(data.terms.exchangeProductId)));
+      }
       match /proposals/{proposalId} {
         allow read: if tradeMember();
+        allow update: if tradeMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time && resource.data.status == 'pending'
+          && tradeState().pendingId == proposalId && tradeStateAfter().pendingId == null
+          && ((request.resource.data.status == 'accepted' && validTradeAcceptance(resource.data) && tradeStateAfter().acceptedId == proposalId)
+            || (tradeStateAfter().acceptedId == tradeState().acceptedId
+              && ((request.resource.data.status == 'rejected' && request.auth.uid == resource.data.recipientId)
+                || (request.resource.data.status == 'withdrawn' && request.auth.uid == resource.data.senderId))));
         allow create: if tradeMember()
           && request.resource.data.keys().hasAll(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
           && request.resource.data.keys().hasOnly(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
@@ -214,6 +232,12 @@ service cloud.firestore {
           && request.resource.data.acceptedId == tradeState().acceptedId
           && !exists(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId))
           && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId)).data.status == 'pending';
+        allow update: if stateId == 'state' && tradeMember()
+          && request.resource.data.keys().hasAll(['pendingId', 'acceptedId']) && request.resource.data.keys().hasOnly(['pendingId', 'acceptedId'])
+          && resource.data.pendingId is string && request.resource.data.pendingId == null
+          && get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'pending'
+          && ((getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'accepted' && request.resource.data.acceptedId == resource.data.pendingId)
+            || (getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status in ['rejected', 'withdrawn'] && request.resource.data.acceptedId == resource.data.acceptedId));
       }
       match /imageUploads/{messageId} {
         function canUpload() {
@@ -400,6 +424,19 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
+      function isTradeReservation() {
+        let roomId = request.resource.data.reservedByRoomId;
+        let statePath = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        let proposalId = getAfter(statePath).data.acceptedId;
+        let proposalPath = /databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId);
+        let proposal = getAfter(proposalPath).data;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedByRoomId'])
+          && resource.data.status == 'available' && request.resource.data.status == 'reserved'
+          && get(statePath).data.pendingId == proposalId && getAfter(statePath).data.pendingId == null
+          && get(proposalPath).data.status == 'pending' && proposal.status == 'accepted'
+          && proposal.recipientId == request.auth.uid
+          && (proposal.productId == productId || proposal.terms.exchangeProductId == productId);
+      }
       function isValidChatCountChange() {
         let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(productId);
         let roomPath = /databases/$(database)/documents/chatRooms/$(get(linkPath).data.roomId);
@@ -470,7 +507,8 @@ service cloud.firestore {
       allow read: if true;
       allow update: if request.auth != null
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
-          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange()));
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange())
+          || isTradeReservation());
       allow create: if request.auth != null
         && isValidProductFields(request.resource.data)
         && request.resource.data.sellerId == request.auth.uid

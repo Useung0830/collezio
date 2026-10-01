@@ -863,6 +863,65 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       },
     );
 
+    await t.test(
+      "제안 수락은 상품을 예약하고 재응답과 임의 예약을 거부한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid);
+        const roomId = await createChatRoom({ productId, userId: user.uid });
+        const terms = {
+          kind: "sale",
+          amount: 10000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "parcel",
+          scheduledAt: Date.now() + 86400000,
+          location: "",
+          shippingPayer: "seller",
+          notes: "",
+        };
+        const id = randomUUID();
+        await createTradeProposal(roomId, user.uid, id, terms, null);
+        await assert.rejects(
+          respondToTradeProposal(roomId, user.uid, id, "accepted"),
+          /권한/,
+        );
+        await assert.rejects(
+          updateDoc(doc(firebaseDb, "products", productId), {
+            status: "reserved",
+            reservedByRoomId: roomId,
+          }),
+          denied,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, id, "accepted");
+        await respondToTradeProposal(roomId, seller.uid, id, "accepted");
+        await assert.rejects(
+          respondToTradeProposal(roomId, seller.uid, id, "rejected"),
+          /이미 처리/,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().status,
+          "reserved",
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        await assert.rejects(
+          respondToTradeProposal(roomId, user.uid, id, "withdrawn"),
+          /이미 처리/,
+        );
+      },
+    );
+
     await t.test("로그아웃 후 이전 사용자 데이터 요청을 차단한다", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(
