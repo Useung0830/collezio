@@ -91,6 +91,114 @@ async function createProduct(
   return productId;
 }
 
+test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 해제해야 전송된다", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const requester = await createAccount(request, "차단 신청자");
+  const seller = await createAccount(request, "차단 판매자");
+  const productId = await createProduct(request, seller.userId, "sale");
+  const secondProductId = await createProduct(
+    request,
+    seller.userId,
+    "exchange",
+  );
+  const sellerContext = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  await sellerContext.route(
+    /^https:\/\/(identitytoolkit|securetoken|firestore)\.googleapis\.com\//,
+    (route) => route.abort(),
+  );
+  try {
+    await login(page, requester);
+    await page.goto(`/products/${productId}`);
+    await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+    await page.getByLabel("메시지", { exact: true }).fill("차단 전 대화");
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    await expect(page.getByText("차단 전 대화", { exact: true })).toBeVisible();
+    const roomUrl = page.url();
+    const otherTab = await page.context().newPage();
+    await otherTab.goto(roomUrl);
+    const sellerPage = await sellerContext.newPage();
+    await login(sellerPage, seller);
+    await sellerPage.goto(roomUrl);
+    await expect(
+      sellerPage.getByLabel("메시지", { exact: true }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "채팅 더보기" }).click();
+    await page.getByRole("button", { name: "차단하기", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "취소" })
+      .click();
+    await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "차단하기", exact: true }).click();
+    await page.getByRole("button", { name: "차단 확인", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      otherTab.getByText("차단한 사용자입니다.", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      sellerPage.getByText("메시지를 보낼 수 없는 대화입니다."),
+    ).toBeVisible();
+    await expect(sellerPage.getByLabel("메시지", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      sellerPage.getByText("차단 전 대화", { exact: true }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByText("차단한 사용자입니다.", { exact: false }),
+    ).toBeVisible();
+    await otherTab.goto(`/products/${secondProductId}`);
+    await expect(
+      otherTab.getByRole("button", { name: "채팅하기", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      otherTab.getByText("이 사용자와 새 대화를 시작할 수 없습니다.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await sellerPage.getByRole("button", { name: "채팅 더보기" }).click();
+    await sellerPage
+      .getByRole("button", { name: "차단하기", exact: true })
+      .click();
+    await sellerPage
+      .getByRole("button", { name: "차단 확인", exact: true })
+      .click();
+    await expect(sellerPage.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "차단 해제", exact: true }).click();
+    await page
+      .getByRole("button", { name: "차단 해제 확인", exact: true })
+      .click();
+    await expect(
+      page.getByText("메시지를 보낼 수 없는 대화입니다."),
+    ).toBeVisible();
+    await sellerPage
+      .getByRole("group", { name: "채팅 관리" })
+      .getByRole("button", { name: "차단 해제", exact: true })
+      .click();
+    await sellerPage
+      .getByRole("button", { name: "차단 해제 확인", exact: true })
+      .click();
+    await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+    await expect(
+      otherTab.getByRole("button", { name: "채팅하기", exact: true }),
+    ).toBeEnabled();
+    await page.getByLabel("메시지", { exact: true }).fill("해제 후 대화");
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    await expect(
+      sellerPage.getByText("해제 후 대화", { exact: true }),
+    ).toBeVisible();
+    await otherTab.close();
+  } finally {
+    await sellerContext.close();
+  }
+});
+
 test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 유지된다", async ({
   page,
   request,

@@ -63,6 +63,11 @@ export default function RegisteredChatRoom({
         key={`${roomId}:${query.userId}`}
         roomId={roomId}
         userId={query.userId}
+        partnerId={
+          query.data.requesterId === query.userId
+            ? query.data.sellerId
+            : query.data.requesterId
+        }
       />
     </div>
   );

@@ -6,6 +6,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+import { validateChatAccess } from "@/features/chat/api/validateChatAccess";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/features/chat/constants/chat";
 import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
 import { parseChatMessage } from "@/features/chat/utils/parseChatMessage";
@@ -68,6 +69,11 @@ export async function sendChatMessage({
             lastMessageId: room.lastMessage?.id ?? null,
             chatCount: null,
           };
+          await validateChatAccess(
+            transaction,
+            userId,
+            userId === room.requesterId ? room.sellerId : room.requesterId,
+          );
           const productRef = doc(firebaseDb, "products", room.productId);
           if (room.status === "draft") {
             if (room.requesterId !== userId)
