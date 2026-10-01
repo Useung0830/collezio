@@ -1,5 +1,7 @@
 "use client";
 
+import { FirebaseError } from "firebase/app";
+
 import Button from "@/components/common/button/Button";
 import LinkButton from "@/components/common/button/LinkButton";
 import ChatConversation from "@/features/chat/components/ChatConversation";
@@ -15,6 +17,9 @@ export default function RegisteredChatRoom({
   roomId,
 }: RegisteredChatRoomProps) {
   const query = useChatRoomQuery(roomId);
+  const hasLostAccess =
+    query.error instanceof FirebaseError &&
+    ["permission-denied", "unauthenticated"].includes(query.error.code);
   if (query.isAuthLoading)
     return (
       <p role="status" className="text-body-16 text-black-900">
@@ -36,7 +41,7 @@ export default function RegisteredChatRoom({
           : "채팅방을 불러오고 있습니다."}
       </p>
     );
-  if (query.isError || !query.data)
+  if (hasLostAccess || !query.data)
     return (
       <div className="text-body-16 text-black-900 flex flex-col items-start gap-3">
         <p role="alert">
@@ -54,13 +59,27 @@ export default function RegisteredChatRoom({
   return (
     <div className="text-black-900 mx-auto flex h-[calc(100dvh-7rem)] min-h-100 w-full max-w-156 flex-col overflow-hidden bg-white">
       <ChatRoomHeader
-        key={`${roomId}:${query.userId}`}
+        key={`header:${roomId}:${query.userId}`}
         chatRoom={query.data}
         userId={query.userId}
       />
       <ChatProductSummary chatRoom={query.data} />
+      {query.isError && (
+        <div className="text-body-14 flex shrink-0 items-center justify-between gap-2 px-4 py-2">
+          <p role="alert">
+            채팅방 정보를 갱신하지 못했습니다. 연결 상태를 확인해주세요.
+          </p>
+          <Button
+            size="sm"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            다시 시도
+          </Button>
+        </div>
+      )}
       <ChatConversation
-        key={`${roomId}:${query.userId}`}
+        key={`conversation:${roomId}:${query.userId}`}
         roomId={roomId}
         userId={query.userId}
         partnerId={

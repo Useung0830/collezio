@@ -3,8 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function canChat(firstId, secondId) {
-      return !exists(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
-        && !exists(/databases/$(database)/documents/users/$(secondId)/chatBlocks/$(firstId));
+      return !existsAfter(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
+        && !existsAfter(/databases/$(database)/documents/users/$(secondId)/chatBlocks/$(firstId));
     }
     match /users/{userId}/chatBlocks/{partnerId} {
       // 상대방은 자신과의 차단 여부만 조회할 수 있고 전체 목록은 읽을 수 없습니다.

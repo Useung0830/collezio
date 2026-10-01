@@ -528,6 +528,21 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
         });
         assert.equal((await getChatMessages(roomId, user.uid)).length, 4);
         const otherProductId = await newProduct(sellerDb, seller.uid);
+        const blockedRoomRef = doc(collection(firebaseDb, "chatRooms"));
+        const blockedRoomBatch = writeBatch(firebaseDb);
+        blockedRoomBatch.set(blockedRoomRef, {
+          productId: otherProductId,
+          sellerId: seller.uid,
+          requesterId: user.uid,
+          status: "draft",
+          visibleTo: [user.uid],
+          createdAt: serverTimestamp(),
+        });
+        blockedRoomBatch.set(
+          doc(firebaseDb, "users", user.uid, "productChats", otherProductId),
+          { roomId: blockedRoomRef.id },
+        );
+        await assert.rejects(blockedRoomBatch.commit(), denied);
         await assert.rejects(
           createChatRoom({ productId: otherProductId, userId: user.uid }),
         );
@@ -590,6 +605,25 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
           doc(sellerDb, "users", seller.uid, "chatBlocks", user.uid),
         );
         await batch.commit();
+        const atomicBatch = writeBatch(firebaseDb);
+        const atomicMessageId = randomUUID();
+        const atomicMessage = {
+          senderId: user.uid,
+          content: "차단과 동시 전송",
+          createdAt: serverTimestamp(),
+        };
+        atomicBatch.set(
+          doc(firebaseDb, "users", user.uid, "chatBlocks", seller.uid),
+          { createdAt: serverTimestamp() },
+        );
+        atomicBatch.set(
+          doc(firebaseDb, "chatRooms", roomId, "messages", atomicMessageId),
+          atomicMessage,
+        );
+        atomicBatch.update(doc(firebaseDb, "chatRooms", roomId), {
+          lastMessage: { id: atomicMessageId, ...atomicMessage },
+        });
+        await assert.rejects(atomicBatch.commit(), denied);
         await sendChatMessage({
           roomId,
           userId: user.uid,
