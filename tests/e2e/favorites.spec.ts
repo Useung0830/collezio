@@ -86,6 +86,64 @@ async function addFavorite(page: Page, productId: string) {
   await expect(button).toBeEnabled();
 }
 
+test("홈에서 상세로 이동해 찜을 추가·취소하면 인기상품 순위가 갱신된다", async ({
+  page,
+  request,
+  productId,
+}) => {
+  const competitorId = randomUUID();
+  const competitorUrl = `${documentsUrl}/products/${competitorId}`;
+  const response = await request.patch(competitorUrl, {
+    headers: ownerHeaders,
+    data: {
+      fields: {
+        title: { stringValue: "최신 경쟁 상품" },
+        favoriteCount: { integerValue: "0" },
+        createdAt: { timestampValue: "2026-10-01T00:00:00Z" },
+        transaction: {
+          mapValue: {
+            fields: {
+              type: { stringValue: "sale" },
+              price: { integerValue: "1000" },
+            },
+          },
+        },
+      },
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  try {
+    await login(page, request);
+    const popular = page.getByRole("region", { name: "인기상품", exact: true });
+    const titles = popular.getByRole("heading", { level: 3 });
+    await expect(titles).toHaveText(["최신 경쟁 상품", "찜 테스트 상품"]);
+    await popular
+      .getByRole("link")
+      .filter({ hasText: "찜 테스트 상품" })
+      .click();
+    await expect(page).toHaveURL(`http://127.0.0.1:3100/products/${productId}`);
+    const button = page.getByRole("button", { name: "찜", exact: true });
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await expect(button).toBeEnabled();
+    await page.getByRole("link", { name: "콜레지오 로고" }).click();
+    await expect(titles).toHaveText(["찜 테스트 상품", "최신 경쟁 상품"]);
+    await expect(
+      popular.getByRole("article").first().getByText("1", { exact: true }),
+    ).toBeVisible();
+    await popular.getByRole("link").first().click();
+    await expect(button).toBeEnabled();
+    await button.click();
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await expect(button).toBeEnabled();
+    await page.getByRole("link", { name: "콜레지오 로고" }).click();
+    await expect(titles).toHaveText(["최신 경쟁 상품", "찜 테스트 상품"]);
+  } finally {
+    await request.delete(competitorUrl, { headers: ownerHeaders });
+  }
+});
+
 test("비로그인 찜 클릭은 로그인 안내를 표시하고 카운트를 유지한다", async ({
   page,
   productId,
