@@ -97,14 +97,12 @@ test("취소는 로그인을 유지하고 확인은 다른 탭·새로고침·�
         .getByRole("banner")
         .getByRole("link", { name: "로그인", exact: true }),
     ).toBeVisible();
-    await expect(
-      otherTab.getByText("로그인하면 내가 등록한 상품을 확인할 수 있습니다."),
-    ).toBeVisible();
+    await expect(otherTab).toHaveURL("http://127.0.0.1:3100/");
     await expect(
       otherTab
-        .getByRole("main")
-        .getByText("로그아웃 검증 보유품", { exact: true }),
-    ).toHaveCount(0);
+        .getByRole("banner")
+        .getByRole("link", { name: "로그인", exact: true }),
+    ).toBeVisible();
     await page.reload();
     await expect(
       page

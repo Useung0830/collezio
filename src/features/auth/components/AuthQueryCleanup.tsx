@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDocFromServer } from "firebase/firestore";
@@ -9,6 +10,7 @@ import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 import { removeUserQueries } from "@/lib/query/removeUserQueries";
 
 export default function AuthQueryCleanup() {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function AuthQueryCleanup() {
       const userId = user?.uid;
       if (previousUserId && previousUserId !== userId) {
         removeUserQueries(queryClient, previousUserId);
+        if (!userId) router.replace("/");
       }
       previousUserId = userId;
       if (userId) {
@@ -53,7 +56,7 @@ export default function AuthQueryCleanup() {
       unsubscribeAuth();
       unsubscribeWithdrawal?.();
     };
-  }, [queryClient]);
+  }, [queryClient, router]);
 
   return null;
 }

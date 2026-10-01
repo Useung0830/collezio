@@ -62,16 +62,20 @@ test("탈퇴 양식 취소·재인증 실패 후 재시도와 계정 삭제·다
   );
   const observer = await context.newPage();
   await observer.goto("/collections");
+  await expect(
+    observer.getByRole("button", { name: "탈퇴하기", exact: true }),
+  ).toBeVisible();
   await dialog.getByLabel("본인 확인을 위한 비밀번호").fill(password);
   await dialog.getByRole("button", { name: "회원 탈퇴", exact: true }).click();
   await expect(page).toHaveURL("http://127.0.0.1:3100/", { timeout: 60_000 });
   await expect(
     page.getByText("회원 탈퇴가 완료되었습니다.", { exact: true }),
   ).toBeVisible();
+  await expect(observer).toHaveURL("http://127.0.0.1:3100/");
   await expect(
-    observer.getByText("로그인하면 내가 등록한 상품을 확인할 수 있습니다.", {
-      exact: true,
-    }),
+    observer
+      .getByRole("banner")
+      .getByRole("link", { name: "로그인", exact: true }),
   ).toBeVisible();
   const status = await request.get(
     `${documentsUrl}/withdrawalRequests/${userId}`,
