@@ -51,7 +51,7 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "createdAt",
+          "fieldPath": "retryAt",
           "order": "ASCENDING"
         }
       ]

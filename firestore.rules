@@ -353,7 +353,7 @@ service cloud.firestore {
       }
       allow read: if true;
       allow update: if isActiveUser()
-        && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.sellerId))
+        && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.get('sellerId', '__legacy__')))
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange()));
       allow create: if isActiveUser()

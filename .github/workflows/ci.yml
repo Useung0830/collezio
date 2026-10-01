@@ -54,6 +54,8 @@ jobs:
         run: npm run build
 
   e2e:
+    env:
+      FUNCTIONS_DISCOVERY_TIMEOUT: "60"
     name: Signup E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -80,7 +82,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run signup and login tests
+      - name: Run integration and E2E tests
         run: npm run test:e2e
 
       - name: Upload test results

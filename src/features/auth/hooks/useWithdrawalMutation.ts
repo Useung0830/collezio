@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { toast } from "react-toastify";
+import { toast } from "react-toastify/unstyled";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FirebaseError } from "firebase/app";
@@ -14,7 +14,11 @@ export function useWithdrawalMutation() {
   const queryClient = useQueryClient();
   const isRunning = useRef(false);
   const mutation = useMutation({
-    mutationFn: deleteAccount,
+    mutationFn: async (input: Parameters<typeof deleteAccount>[0]) => {
+      const result = await deleteAccount(input);
+      await signOut(firebaseAuth);
+      return result;
+    },
     retry: false,
     networkMode: "always",
   });
@@ -23,8 +27,7 @@ export function useWithdrawalMutation() {
     isRunning.current = true;
     try {
       const result = await mutation.mutateAsync(input);
-      queryClient.clear();
-      await signOut(firebaseAuth);
+      queryClient.removeQueries();
       router.replace("/");
       toast.success(
         result.status === "completed"

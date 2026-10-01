@@ -31,6 +31,7 @@ export async function processWithdrawal({ db, auth, bucket }, userId) {
     if (snapshot.get("leaseUntil")?.toMillis() > Date.now()) return false;
     transaction.update(reference, {
       leaseId,
+      retryAt: Timestamp.fromMillis(Date.now() + LEASE_MS),
       leaseUntil: Timestamp.fromMillis(Date.now() + LEASE_MS),
     });
     return true;

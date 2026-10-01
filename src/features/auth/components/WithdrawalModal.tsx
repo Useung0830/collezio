@@ -1,16 +1,11 @@
 ﻿"use client";
 
-import type {
-  ChangeEvent,
-  FormEvent,
-  KeyboardEvent,
-  MouseEvent,
-  SyntheticEvent,
-} from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
+import { useId, useState } from "react";
 
 import Button from "@/components/common/button/Button";
 import WithdrawalFeedbackFields from "@/features/auth/components/WithdrawalFeedbackFields";
+import { useWithdrawalDialog } from "@/features/auth/hooks/useWithdrawalDialog";
 import { useWithdrawalMutation } from "@/features/auth/hooks/useWithdrawalMutation";
 import type { WithdrawalFeedback } from "@/features/auth/types/withdrawal";
 
@@ -20,46 +15,26 @@ export default function WithdrawalModal({
   onClose,
   onConfirm,
 }: WithdrawalModalProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const { withdraw, isPending, errorMessage } = useWithdrawalMutation();
+  const {
+    dialogRef,
+    handleClose,
+    handleCancel,
+    handleBackdropClick,
+    handleKeyDown,
+  } = useWithdrawalDialog(isPending, onClose);
   const [feedback, setFeedback] = useState<WithdrawalFeedback>({
     reasons: [],
     detail: "",
   });
   const [password, setPassword] = useState("");
-  const handleClose = () => {
-    if (!isPending) onClose();
-  };
   const handlePasswordChange = (event: ChangeEvent<HTMLInputElement>) =>
     setPassword(event.currentTarget.value);
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (await withdraw({ feedback, password })) onConfirm();
   };
-  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
-    event.preventDefault();
-    handleClose();
-  };
-  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target !== event.currentTarget) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    if (
-      event.clientX < rect.left ||
-      event.clientX > rect.right ||
-      event.clientY < rect.top ||
-      event.clientY > rect.bottom
-    )
-      handleClose();
-  };
-  const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") event.stopPropagation();
-  };
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
   return (
     <dialog
       ref={dialogRef}

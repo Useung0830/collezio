@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { error as logError } from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
@@ -47,6 +47,7 @@ export const withdrawAccount = onCall(
         feedback,
         feedbackId: randomUUID(),
         createdAt: FieldValue.serverTimestamp(),
+        retryAt: Timestamp.now(),
         stage: 0,
         cursor: "",
       });
@@ -73,7 +74,8 @@ export const retryWithdrawals = onSchedule(
     const requests = await db
       .collection("withdrawalRequests")
       .where("status", "==", "processing")
-      .orderBy("createdAt")
+      .where("retryAt", "<=", Timestamp.now())
+      .orderBy("retryAt")
       .limit(10)
       .get();
     await Promise.all(
