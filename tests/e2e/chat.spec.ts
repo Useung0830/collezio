@@ -91,6 +91,33 @@ async function createProduct(
   return productId;
 }
 
+test("채팅 목록에서 뒤로가면 채팅을 시작한 상품 상세로 돌아간다", async ({
+  page,
+  request,
+}) => {
+  const requester = await createAccount(request, "뒤로가기 신청자");
+  const seller = await createAccount(request, "뒤로가기 판매자");
+  const productId = await createProduct(request, seller.userId, "exchange");
+  const productUrl = `http://127.0.0.1:3100/products/${productId}`;
+
+  await login(page, requester);
+  await page.goto(productUrl);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await expect(page).toHaveURL(/\/chat\/[A-Za-z0-9]{20}$/);
+  await page.reload();
+  await page
+    .getByRole("link", { name: "채팅 목록으로 돌아가기", exact: true })
+    .click();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/chat");
+  await page.getByRole("button", { name: "이전 페이지로 이동" }).click();
+  await expect(page).toHaveURL(productUrl);
+
+  await page.goForward();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/chat");
+  await page.goBack();
+  await expect(page).toHaveURL(productUrl);
+});
+
 test("상품별 채팅방 생성·재진입·내 목록 표시와 판매자 비공개", async ({
   page,
   request,
