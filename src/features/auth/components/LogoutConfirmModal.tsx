@@ -35,6 +35,21 @@ export default function LogoutConfirmModal({
       aria-busy={isPending}
       onKeyDown={(event) => {
         if (event.key === "Escape") event.stopPropagation();
+        if (event.key !== "Tab") return;
+        const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>(
+          "button:not(:disabled)",
+        );
+        const first = buttons[0];
+        const last = buttons[buttons.length - 1];
+        if (!first || !last) {
+          event.preventDefault();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
       }}
       onCancel={(event) => {
         event.preventDefault();
