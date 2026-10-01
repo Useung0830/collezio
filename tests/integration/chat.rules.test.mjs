@@ -103,14 +103,17 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       `${randomUUID()}@example.com`,
       "Test1234!",
     );
-  const newProduct = (db, sellerId) => {
+  const newProduct = (db, sellerId, kind = "sale") => {
     const ref = doc(collection(db, "products"));
     return setDoc(ref, {
       title: "채팅 테스트 상품",
       description: "상품별 채팅 확인",
       sellerId,
       status: "available",
-      transaction: { type: "sale", price: 12000 },
+      transaction:
+        kind === "sale"
+          ? { type: "sale", price: 12000 }
+          : { type: "exchange", desiredItemName: "교환 상품" },
       delivery: { type: "parcel", shippingFee: 0 },
       images: [
         { url: "https://example.com/product.png", path: "test/product" },
@@ -919,6 +922,99 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
           respondToTradeProposal(roomId, user.uid, id, "withdrawn"),
           /이미 처리/,
         );
+      },
+    );
+
+    await t.test(
+      "교환 조건 변경은 기존 예약을 유지하고 수락 시 교환 상품을 교체한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid, "exchange");
+        const firstProduct = await newProduct(firebaseDb, user.uid);
+        const secondProduct = await newProduct(firebaseDb, user.uid);
+        const roomId = await createChatRoom({ productId, userId: user.uid });
+        const terms = {
+          kind: "exchange",
+          amount: 0,
+          exchangeProductId: firstProduct,
+          extraAmount: 1000,
+          extraPayer: "seller",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "서울역",
+          shippingPayer: "each",
+          notes: "",
+        };
+        const first = randomUUID();
+        await createTradeProposal(roomId, user.uid, first, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, first, "accepted");
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        const rejected = randomUUID();
+        await createTradeProposal(
+          roomId,
+          user.uid,
+          rejected,
+          { ...terms, exchangeProductId: secondProduct },
+          first,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", firstProduct))
+          ).data().status,
+          "reserved",
+        );
+        await respondToTradeProposal(roomId, user.uid, rejected, "withdrawn");
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(firebaseDb, "chatRooms", roomId, "trade", "state"),
+            )
+          ).data().acceptedId,
+          first,
+        );
+        const next = randomUUID();
+        await createTradeProposal(
+          roomId,
+          user.uid,
+          next,
+          { ...terms, exchangeProductId: secondProduct },
+          first,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, next, "accepted");
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", firstProduct))
+          ).data().status,
+          "available",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", secondProduct))
+          ).data().status,
+          "reserved",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(firebaseDb, "chatRooms", roomId, "proposals", first),
+            )
+          ).data().status,
+          "superseded",
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
       },
     );
 

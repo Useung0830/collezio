@@ -42,8 +42,17 @@ export async function respondToTradeProposal(
     if (proposal.status !== "pending" || state.pendingId !== id)
       throw new Error("이미 처리된 제안입니다. 최신 상태를 확인해주세요.");
     if (action === "accepted") {
-      if (proposal.previousId !== null)
-        throw new Error("조건 변경 수락을 준비하고 있습니다.");
+      if (proposal.previousId !== state.acceptedId)
+        throw new Error("확정 조건이 변경되었습니다. 다시 확인해주세요.");
+      const previousRef = proposal.previousId
+        ? doc(roomRef, "proposals", proposal.previousId)
+        : null;
+      const previous = previousRef ? await tx.get(previousRef) : null;
+      if (
+        previous &&
+        (!previous.exists() || previous.data().status !== "accepted")
+      )
+        throw new Error("이전 약속을 확인할 수 없습니다.");
       const terms = validateTradeTerms(proposal.terms);
       await validateChatAccess(tx, room.requesterId, room.sellerId);
       const productIds = [
@@ -60,7 +69,11 @@ export async function respondToTradeProposal(
           !product.exists() ||
           product.data().sellerId !==
             (index === 0 ? room.sellerId : room.requesterId) ||
-          product.data().status !== "available"
+          !(
+            product.data().status === "available" ||
+            (product.data().status === "reserved" &&
+              product.data().reservedByRoomId === roomId)
+          )
         )
           throw new Error(
             "상품이 이미 예약되었거나 거래할 수 없는 상태입니다.",
@@ -68,10 +81,32 @@ export async function respondToTradeProposal(
         if (index === 0 && product.data().transaction.type !== terms.kind)
           throw new Error("상품의 거래 종류가 변경되었습니다.");
       }
+      const oldExchangeId = previous?.data()?.terms.exchangeProductId;
+      const released =
+        oldExchangeId && oldExchangeId !== terms.exchangeProductId
+          ? await tx.get(doc(firebaseDb, "products", oldExchangeId))
+          : null;
+      if (
+        released &&
+        (!released.exists() ||
+          released.data().status !== "reserved" ||
+          released.data().reservedByRoomId !== roomId)
+      )
+        throw new Error("기존 교환 상품의 예약 상태를 확인해주세요.");
       for (const product of products)
         tx.update(product.ref, {
           status: "reserved",
           reservedByRoomId: roomId,
+        });
+      if (released)
+        tx.update(released.ref, {
+          status: "available",
+          reservedByRoomId: null,
+        });
+      if (previousRef)
+        tx.update(previousRef, {
+          status: "superseded",
+          updatedAt: serverTimestamp(),
         });
     }
     validateFirebaseUser(userId);

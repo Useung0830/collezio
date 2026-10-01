@@ -187,18 +187,30 @@ service cloud.firestore {
           && ((t.kind == 'sale' && t.exchangeProductId == null && t.extraAmount == 0 && t.extraPayer == 'none')
             || (t.kind == 'exchange' && t.amount == 0 && t.exchangeProductId is string && t.exchangeProductId.matches('^[a-zA-Z0-9-]{1,128}$')));
       }
-      function reservedAfter(productId) {
+      function reservedAfter(productId, ownerId) {
         let product = getAfter(/databases/$(database)/documents/products/$(productId)).data;
-        return product.status == 'reserved' && product.reservedByRoomId == roomId;
+        return product.status == 'reserved' && product.reservedByRoomId == roomId && product.sellerId == ownerId;
       }
       function validTradeAcceptance(data) {
         return request.auth.uid == data.recipientId && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
-          && data.previousId == null && data.terms.scheduledAt > request.time.toMillis()
-          && availableForTrade(data.productId, tradeRoom().sellerId) && reservedAfter(data.productId)
-          && (data.terms.kind == 'sale' || (availableForTrade(data.terms.exchangeProductId, tradeRoom().requesterId) && reservedAfter(data.terms.exchangeProductId)));
+          && data.previousId == tradeState().acceptedId && data.terms.scheduledAt > request.time.toMillis()
+          && (data.previousId == null || getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(data.previousId)).data.status == 'superseded')
+          && reservedAfter(data.productId, tradeRoom().sellerId)
+          && (data.terms.kind == 'sale' || reservedAfter(data.terms.exchangeProductId, tradeRoom().requesterId));
+      }
+      function validSuperseded(previous, proposalId) {
+        let next = getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(tradeStateAfter().acceptedId)).data;
+        return previous.status == 'accepted' && tradeState().acceptedId == proposalId
+          && next.previousId == proposalId && next.status == 'accepted' && next.recipientId == request.auth.uid
+          && (previous.terms.exchangeProductId == null || previous.terms.exchangeProductId == next.terms.exchangeProductId
+            || (getAfter(/databases/$(database)/documents/products/$(previous.terms.exchangeProductId)).data.status == 'available'
+              && getAfter(/databases/$(database)/documents/products/$(previous.terms.exchangeProductId)).data.reservedByRoomId == null));
       }
       match /proposals/{proposalId} {
         allow read: if tradeMember();
+        allow update: if tradeMember() && request.resource.data.status == 'superseded'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time && validSuperseded(resource.data, proposalId);
         allow update: if tradeMember()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
           && request.resource.data.updatedAt == request.time && resource.data.status == 'pending'
@@ -431,11 +443,23 @@ service cloud.firestore {
         let proposalPath = /databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId);
         let proposal = getAfter(proposalPath).data;
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedByRoomId'])
-          && resource.data.status == 'available' && request.resource.data.status == 'reserved'
+          && (resource.data.status == 'available' || (resource.data.status == 'reserved' && resource.data.get('reservedByRoomId', null) == roomId)) && request.resource.data.status == 'reserved'
           && get(statePath).data.pendingId == proposalId && getAfter(statePath).data.pendingId == null
           && get(proposalPath).data.status == 'pending' && proposal.status == 'accepted'
           && proposal.recipientId == request.auth.uid
           && (proposal.productId == productId || proposal.terms.exchangeProductId == productId);
+      }
+      function isTradeRelease() {
+        let roomId = resource.data.reservedByRoomId;
+        let statePath = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        let proposalId = getAfter(statePath).data.acceptedId;
+        let proposalPath = /databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId);
+        let proposal = getAfter(proposalPath).data;
+        let previous = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposal.previousId)).data;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedByRoomId'])
+          && resource.data.status == 'reserved' && request.resource.data.status == 'available' && request.resource.data.reservedByRoomId == null
+          && get(statePath).data.pendingId == proposalId && get(proposalPath).data.status == 'pending' && proposal.status == 'accepted'
+          && proposal.recipientId == request.auth.uid && previous.terms.exchangeProductId == productId && proposal.terms.exchangeProductId != productId;
       }
       function isValidChatCountChange() {
         let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(productId);
@@ -508,7 +532,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange())
-          || isTradeReservation());
+          || isTradeReservation() || isTradeRelease());
       allow create: if request.auth != null
         && isValidProductFields(request.resource.data)
         && request.resource.data.sellerId == request.auth.uid

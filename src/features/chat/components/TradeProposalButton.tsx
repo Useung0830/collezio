@@ -21,6 +21,7 @@ export default function TradeProposalButton({
   const query = useTradeProposals(room.id, userId);
   const client = useQueryClient();
   const [initial, setInitial] = useState<TradeTerms | null>(null);
+  const openedProposalId = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const previous = useRef<{ id: string; content: string } | null>(null);
@@ -34,6 +35,7 @@ export default function TradeProposalButton({
     try {
       const product = await getRegisteredProduct(room.productId, userId);
       if (!product) throw new Error("상품을 찾을 수 없습니다.");
+      openedProposalId.current = accepted?.id ?? null;
       setInitial(
         accepted?.terms ?? {
           kind: product.transaction.type,
@@ -63,7 +65,13 @@ export default function TradeProposalButton({
         ? previous.current.id
         : crypto.randomUUID();
     previous.current = { id, content };
-    await createTradeProposal(room.id, userId, id, terms, accepted?.id ?? null);
+    await createTradeProposal(
+      room.id,
+      userId,
+      id,
+      terms,
+      openedProposalId.current,
+    );
     await client.invalidateQueries({ queryKey: ["chat"] });
     previous.current = null;
   };
