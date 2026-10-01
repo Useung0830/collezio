@@ -31,7 +31,7 @@ export async function sendChatMessage({
   if (
     (!text && !image) ||
     text.length > MAX_CHAT_MESSAGE_LENGTH ||
-    messageId.length > 126
+    messageId.length > (image ? 126 : 128)
   )
     throw new Error("메시지는 1~2,000자로 입력해주세요.");
   await firebaseAuth.authStateReady();

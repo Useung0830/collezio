@@ -7,6 +7,14 @@ import { expect, test as base } from "./fixtures";
 const documentsUrl =
   "http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents";
 const ownerHeaders = { Authorization: "Bearer owner" };
+const chatImage = {
+  name: "chat.png",
+  mimeType: "image/png",
+  buffer: Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+    "base64",
+  ),
+};
 
 const test = base.extend<{ productIds: string[] }>({
   productIds: async ({ request }, runWithProducts) => {
@@ -660,6 +668,145 @@ test("첫 전송 실패 시 입력을 보존하고 재시도 후 한 번만 저�
   await expect(
     page.getByLabel("대화 메시지").getByRole("listitem"),
   ).toHaveCount(1);
+});
+
+test("이미지 선택과 취소 후 이미지·텍스트가 순서대로 전달되고 스크롤바는 숨겨진다", async ({
+  page,
+  request,
+  productIds,
+  browser,
+}) => {
+  const buyer = await createAccount(request, "이미지 구매자");
+  const seller = await createAccount(request, "이미지 판매자");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
+  await login(page, buyer);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await expect(page).toHaveURL(/\/chat\/[A-Za-z0-9]{20}$/);
+  const roomUrl = page.url();
+  const input = page.getByLabel("메시지", { exact: true });
+  await expect(input).toBeEnabled();
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "사진 첨부", exact: true }).click();
+  await (await chooserPromise).setFiles(chatImage);
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toBeVisible();
+  await input.fill("선택 후에도 입력 가능");
+  await page.getByRole("button", { name: "첨부 이미지 삭제" }).click();
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toHaveCount(0);
+  await expect(input).toHaveValue("선택 후에도 입력 가능");
+  await page.getByLabel("채팅 이미지 선택").setInputFiles({
+    name: "invalid.gif",
+    mimeType: "image/gif",
+    buffer: Buffer.from("invalid"),
+  });
+  await expect(
+    page.getByText("JPG, PNG, WebP 이미지만 첨부할 수 있습니다."),
+  ).toBeVisible();
+  await page.getByLabel("채팅 이미지 선택").setInputFiles(chatImage);
+  await input.fill(
+    Array.from({ length: 20 }, (_, i) => `여러 줄 ${i}`).join("\n"),
+  );
+  expect(
+    await input.evaluate((element) => getComputedStyle(element).scrollbarWidth),
+  ).toBe("none");
+  expect(
+    await input.evaluate(
+      (element) => element.scrollHeight > element.clientHeight,
+    ),
+  ).toBeTruthy();
+  await input.fill("사진과 함께 보내는 설명");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/chat-image-preview.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "메시지 전송" }).click();
+  const items = page.getByLabel("대화 메시지").getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0).getByAltText("채팅 이미지")).toBeVisible();
+  await expect(items.nth(1)).toContainText("사진과 함께 보내는 설명");
+  await expect(input).toHaveValue("");
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toHaveCount(0);
+  expect(
+    await items
+      .nth(0)
+      .getByAltText("채팅 이미지")
+      .evaluate((image: HTMLImageElement) => image.naturalWidth),
+  ).toBeGreaterThan(0);
+  await page.reload();
+  await expect(items.nth(0).getByAltText("채팅 이미지")).toBeVisible();
+  await expect(items.nth(1)).toContainText("사진과 함께 보내는 설명");
+  const sellerContext = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  try {
+    const sellerPage = await sellerContext.newPage();
+    await login(sellerPage, seller);
+    await sellerPage.goto(roomUrl);
+    await expect(sellerPage.getByAltText("채팅 이미지")).toBeVisible();
+    await expect(
+      sellerPage.getByText("사진과 함께 보내는 설명", { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel("채팅 이미지 선택").setInputFiles(chatImage);
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    await expect(sellerPage.getByAltText("채팅 이미지")).toHaveCount(2);
+    await page.screenshot({
+      path: "test-results/chat-images-sent.png",
+      fullPage: true,
+    });
+  } finally {
+    await sellerContext.close();
+  }
+});
+
+test("업로드 후 메시지 확정 실패 시 이미지와 입력을 보존하고 재시도한다", async ({
+  page,
+  request,
+  productIds,
+}) => {
+  const buyer = await createAccount(request, "이미지 재시도 구매자");
+  const seller = await createAccount(request, "이미지 재시도 판매자");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
+  const productUrl = `${documentsUrl}/products/${productId}`;
+  const original = await (
+    await request.get(productUrl, { headers: ownerHeaders })
+  ).json();
+  await login(page, buyer);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  const input = page.getByLabel("메시지", { exact: true });
+  await expect(input).toBeEnabled();
+  await page.getByLabel("채팅 이미지 선택").setInputFiles(chatImage);
+  await input.fill("재시도 설명");
+  await request.delete(productUrl, { headers: ownerHeaders });
+  await page.getByRole("button", { name: "메시지 전송" }).click();
+  await expect(
+    page.getByText(
+      "메시지를 보내지 못했습니다. 내용을 확인하고 다시 보내주세요.",
+    ),
+  ).toBeVisible();
+  await expect(input).toHaveValue("재시도 설명");
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toBeVisible();
+  await expect(page.getByLabel("대화 메시지")).toHaveCount(0);
+  await request.patch(productUrl, {
+    headers: ownerHeaders,
+    data: { fields: original.fields },
+  });
+  await page.getByRole("button", { name: "메시지 전송" }).click();
+  await expect(
+    page.getByLabel("대화 메시지").getByRole("listitem"),
+  ).toHaveCount(2);
+  await expect(page.getByAltText("채팅 이미지")).toBeVisible();
 });
 
 test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({
