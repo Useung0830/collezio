@@ -16,7 +16,10 @@ export default function ChatConversation({
 }: ChatConversationProps) {
   const query = useChatMessagesQuery(roomId, userId);
   return (
-    <section className="bg-black-50 flex min-h-0 flex-1 flex-col gap-3 px-4 py-5">
+    <section
+      aria-label="채팅 대화"
+      className="bg-black-50 flex min-h-0 flex-1 flex-col gap-6 px-3 pt-7 pb-6 sm:px-4"
+    >
       {query.isPending ? (
         <p role="status" className="text-body-14 text-black-900 flex-1">
           메시지를 불러오고 있습니다.
