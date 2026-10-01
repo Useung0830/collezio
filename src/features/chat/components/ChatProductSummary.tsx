@@ -1,15 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import TradeProposalButton from "@/features/chat/components/TradeProposalButton";
 import type { ChatRoomView } from "@/features/chat/types/registeredChatRoom";
 
 import ExchangeIcon from "@/assets/icons/icon-exchange.svg";
 import GalleryIcon from "@/assets/icons/icon-gallery.svg";
 
-type ChatProductSummaryProps = { chatRoom: ChatRoomView };
+type ChatProductSummaryProps = { chatRoom: ChatRoomView; userId: string };
 
 export default function ChatProductSummary({
   chatRoom,
+  userId,
 }: ChatProductSummaryProps) {
   const transaction = chatRoom.transaction;
   return (
@@ -72,17 +74,7 @@ export default function ChatProductSummary({
           </div>
         )}
       </div>
-      {transaction && (
-        <button
-          type="button"
-          disabled
-          title="거래 확정 기능 준비 중"
-          aria-label={`${transaction.type === "sale" ? "구매하기" : "교환하기"} (준비 중)`}
-          className={`text-caption-12-bold shrink-0 rounded-full px-3 py-2 text-white disabled:cursor-not-allowed ${transaction.type === "sale" ? "bg-brand-blue" : "bg-brand-green"}`}
-        >
-          {transaction.type === "sale" ? "구매하기" : "교환하기"}
-        </button>
-      )}
+      {transaction && <TradeProposalButton room={chatRoom} userId={userId} />}
     </section>
   );
 }

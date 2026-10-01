@@ -3,16 +3,19 @@
 import { useEffect, useRef } from "react";
 
 import ChatMessageImage from "@/features/chat/components/ChatMessageImage";
+import TradeProposalCard from "@/features/chat/components/TradeProposalCard";
 import type { ChatMessage } from "@/features/chat/types/chatMessage";
 
 import styles from "./ChatMessageList.module.css";
 
 interface ChatMessageListProps {
+  roomId: string;
   messages: ChatMessage[];
   userId: string;
 }
 
 export default function ChatMessageList({
+  roomId,
   messages,
   userId,
 }: ChatMessageListProps) {
@@ -50,7 +53,13 @@ export default function ChatMessageList({
                 aria-label={isMine ? "내 메시지" : "상대방 메시지"}
                 className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
               >
-                {message.imagePaths || message.imagePath ? (
+                {message.proposalId ? (
+                  <TradeProposalCard
+                    roomId={roomId}
+                    userId={userId}
+                    proposalId={message.proposalId}
+                  />
+                ) : message.imagePaths || message.imagePath ? (
                   <ChatMessageImage
                     paths={
                       message.imagePaths ??

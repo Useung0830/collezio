@@ -63,7 +63,7 @@ export default function RegisteredChatRoom({
         chatRoom={query.data}
         userId={query.userId}
       />
-      <ChatProductSummary chatRoom={query.data} />
+      <ChatProductSummary chatRoom={query.data} userId={query.userId} />
       {query.isError && (
         <div className="text-body-14 flex shrink-0 items-center justify-between gap-2 px-4 py-2">
           <p role="alert">

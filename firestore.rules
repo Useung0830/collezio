@@ -163,6 +163,58 @@ service cloud.firestore {
     }
 
     match /chatRooms/{roomId} {
+      function tradeRoom() { return get(/databases/$(database)/documents/chatRooms/$(roomId)).data; }
+      function tradeMember() { return request.auth != null && request.auth.uid in tradeRoom().visibleTo; }
+      function tradeState() {
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        return exists(path) ? get(path).data : {'pendingId': null, 'acceptedId': null};
+      }
+      function tradeStateAfter() { return getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/trade/state).data; }
+      function availableForTrade(productId, ownerId) {
+        let product = get(/databases/$(database)/documents/products/$(productId)).data;
+        return product.sellerId == ownerId && (product.status == 'available' || (product.status == 'reserved' && product.get('reservedByRoomId', null) == roomId));
+      }
+      function validTradeTerms(t) {
+        return t.keys().hasAll(['kind', 'amount', 'exchangeProductId', 'extraAmount', 'extraPayer', 'method', 'scheduledAt', 'location', 'shippingPayer', 'notes'])
+          && t.keys().hasOnly(['kind', 'amount', 'exchangeProductId', 'extraAmount', 'extraPayer', 'method', 'scheduledAt', 'location', 'shippingPayer', 'notes'])
+          && t.amount is int && t.amount >= 0 && t.amount <= 1000000000
+          && t.extraAmount is int && t.extraAmount >= 0 && t.extraAmount <= 1000000000
+          && ((t.extraAmount == 0 && t.extraPayer == 'none') || (t.extraAmount > 0 && t.extraPayer in ['requester', 'seller']))
+          && t.scheduledAt is int && t.scheduledAt > request.time.toMillis() && t.scheduledAt <= request.time.toMillis() + 31622400000
+          && t.location is string && t.location.size() <= 200 && t.notes is string && t.notes.size() <= 1000
+          && t.method in ['direct', 'parcel'] && (t.method == 'parcel' || t.location.matches('(?s).*\\S.*'))
+          && t.shippingPayer in ['requester', 'seller', 'each']
+          && ((t.kind == 'sale' && t.exchangeProductId == null && t.extraAmount == 0 && t.extraPayer == 'none')
+            || (t.kind == 'exchange' && t.amount == 0 && t.exchangeProductId is string && t.exchangeProductId.matches('^[a-zA-Z0-9-]{1,128}$')));
+      }
+      match /proposals/{proposalId} {
+        allow read: if tradeMember();
+        allow create: if tradeMember()
+          && request.resource.data.keys().hasAll(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
+          && request.resource.data.keys().hasOnly(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.recipientId == (request.auth.uid == tradeRoom().requesterId ? tradeRoom().sellerId : tradeRoom().requesterId)
+          && request.resource.data.productId == tradeRoom().productId
+          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+          && validTradeTerms(request.resource.data.terms)
+          && request.resource.data.terms.kind == get(/databases/$(database)/documents/products/$(tradeRoom().productId)).data.transaction.type
+          && availableForTrade(tradeRoom().productId, tradeRoom().sellerId)
+          && (request.resource.data.terms.kind == 'sale' || availableForTrade(request.resource.data.terms.exchangeProductId, tradeRoom().requesterId))
+          && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && tradeState().pendingId == null && request.resource.data.previousId == tradeState().acceptedId
+          && (request.resource.data.previousId != null || request.auth.uid == tradeRoom().requesterId)
+          && tradeStateAfter().pendingId == proposalId && tradeStateAfter().acceptedId == tradeState().acceptedId
+          && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/messages/$(proposalId)).data.proposalId == proposalId;
+      }
+      match /trade/{stateId} {
+        allow read: if stateId == 'state' && tradeMember();
+        allow create, update: if stateId == 'state' && tradeMember()
+          && request.resource.data.keys().hasAll(['pendingId', 'acceptedId']) && request.resource.data.keys().hasOnly(['pendingId', 'acceptedId'])
+          && tradeState().pendingId == null && request.resource.data.pendingId is string
+          && request.resource.data.acceptedId == tradeState().acceptedId
+          && !exists(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId))
+          && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId)).data.status == 'pending';
+      }
       match /imageUploads/{messageId} {
         function canUpload() {
           let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
@@ -183,7 +235,10 @@ service cloud.firestore {
       }
       function isValidMessage(data, messageId) {
         return data.keys().hasAll(['content', 'senderId', 'createdAt'])
-          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId', 'proposalId'])
+          && (!('proposalId' in data) || (data.proposalId == messageId && !('imagePath' in data) && !('imagePaths' in data) && !('previousMessageId' in data)
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(messageId)).data.senderId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(messageId)).data.createdAt == request.time))
           && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
           && data.content.matches('(?s).*\\S.*')
           && data.senderId == request.auth.uid && data.createdAt == request.time
@@ -233,7 +288,8 @@ service cloud.firestore {
         let messagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(summary.id);
         let message = getAfter(messagePath).data;
         return summary.keys().hasAll(['id', 'content', 'senderId', 'createdAt'])
-          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId'])
+          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId', 'proposalId'])
+          && summary.get('proposalId', null) == message.get('proposalId', null)
           && summary.id is string && summary.id.size() > 0 && summary.id.size() <= 128
           && !exists(messagePath)
           && summary.content == message.content && summary.senderId == message.senderId
@@ -294,6 +350,7 @@ service cloud.firestore {
             && room.lastMessage.createdAt == data.createdAt
             && ((room.lastMessage.id == messageId
               && room.lastMessage.content == data.content
+              && room.lastMessage.get('proposalId', null) == data.get('proposalId', null)
               && room.lastMessage.get('imagePath', null) == data.get('imagePath', null)
               && room.lastMessage.get('imagePaths', null) == data.get('imagePaths', null)
               && room.lastMessage.get('previousMessageId', null) == data.get('previousMessageId', null))

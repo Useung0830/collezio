@@ -6,6 +6,7 @@ export interface ChatMessage {
   imagePath?: string;
   imagePaths?: string[];
   previousMessageId?: string;
+  proposalId?: string;
 }
 
 export interface SendChatMessageInput {

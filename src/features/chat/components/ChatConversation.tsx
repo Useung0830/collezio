@@ -40,7 +40,11 @@ export default function ChatConversation({
           </Button>
         </div>
       ) : query.data?.length ? (
-        <ChatMessageList messages={query.data} userId={userId} />
+        <ChatMessageList
+          roomId={roomId}
+          messages={query.data}
+          userId={userId}
+        />
       ) : (
         <div className="text-body-14 text-black-900 flex flex-1 flex-col items-center justify-center gap-2 px-3 text-center">
           <p>아직 시작하지 않은 대화입니다.</p>

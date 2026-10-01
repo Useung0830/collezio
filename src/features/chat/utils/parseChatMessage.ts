@@ -22,6 +22,14 @@ export function parseChatMessage(id: string, value: unknown): ChatMessage {
   validateChatDocumentId(id);
   validateChatDocumentId(data.senderId);
   if (
+    data.proposalId !== undefined &&
+    (data.proposalId !== id ||
+      data.imagePath !== undefined ||
+      data.imagePaths !== undefined ||
+      data.previousMessageId !== undefined)
+  )
+    throw new Error("거래 제안 메시지를 확인할 수 없습니다.");
+  if (
     data.imagePath !== undefined &&
     (typeof data.imagePath !== "string" ||
       !data.imagePath.startsWith("chat/") ||
@@ -68,6 +76,9 @@ export function parseChatMessage(id: string, value: unknown): ChatMessage {
     content: data.content,
     senderId: data.senderId,
     createdAt: data.createdAt.toDate().toISOString(),
+    ...(typeof data.proposalId === "string"
+      ? { proposalId: data.proposalId }
+      : {}),
     ...(typeof data.imagePath === "string"
       ? { imagePath: data.imagePath }
       : {}),

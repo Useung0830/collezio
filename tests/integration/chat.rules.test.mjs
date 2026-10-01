@@ -804,6 +804,65 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       },
     );
 
+    await t.test(
+      "거래 제안은 첫 메시지로 공개되며 재시도와 중복 대기를 막는다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const proposalRoomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const terms = {
+          kind: "sale",
+          amount: 12000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "강남역",
+          shippingPayer: "requester",
+          notes: "거래 제안 테스트",
+        };
+        const id = randomUUID();
+        await createTradeProposal(proposalRoomId, user.uid, id, terms, null);
+        await createTradeProposal(proposalRoomId, user.uid, id, terms, null);
+        assert.equal(
+          (await getChatMessages(proposalRoomId, user.uid)).length,
+          1,
+        );
+        assert.equal(
+          (await getChatMessages(proposalRoomId, user.uid))[0].proposalId,
+          id,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(sellerDb, "chatRooms", proposalRoomId, "proposals", id),
+            )
+          ).data().status,
+          "pending",
+        );
+        await assert.rejects(
+          getDocFromServer(
+            doc(strangerDb, "chatRooms", proposalRoomId, "proposals", id),
+          ),
+          denied,
+        );
+        await assert.rejects(
+          createTradeProposal(
+            proposalRoomId,
+            user.uid,
+            randomUUID(),
+            terms,
+            null,
+          ),
+          /응답 대기/,
+        );
+      },
+    );
+
     await t.test("로그아웃 후 이전 사용자 데이터 요청을 차단한다", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(
