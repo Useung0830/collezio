@@ -1,6 +1,6 @@
-import { productDetails } from "@/features/products/mocks/products";
 import type { CompletedTrade, ReviewTag } from "@/features/review/types/review";
 
+import productImage from "@/assets/images/product-luffy-cutout.png";
 import profileImage from "@/assets/images/profile.png";
 
 export const reviewTags: ReviewTag[] = [
@@ -24,14 +24,14 @@ export const completedTrades: CompletedTrade[] = [
     partnerTradeCount: 12,
     partnerRating: 4.9,
     ownedProduct: {
-      id: productDetails[0].id,
-      title: productDetails[0].title,
-      image: productDetails[0].image,
+      id: 1,
+      title: "원피스 루피 기어5 피규어",
+      image: productImage,
     },
     receivedProduct: {
-      id: productDetails[1].id,
-      title: productDetails[1].title,
-      image: productDetails[1].image,
+      id: 2,
+      title: "나루토 카카시 한정판 피규어",
+      image: productImage,
     },
   },
   {
@@ -43,9 +43,9 @@ export const completedTrades: CompletedTrade[] = [
     partnerTradeCount: 31,
     partnerRating: 4.8,
     product: {
-      id: productDetails[2].id,
-      title: productDetails[2].title,
-      image: productDetails[2].image,
+      id: 3,
+      title: "포켓몬 피카츄 봉제인형",
+      image: productImage,
     },
     price: 32000,
     tradeMethod: "parcel",
@@ -59,9 +59,9 @@ export const completedTrades: CompletedTrade[] = [
     partnerTradeCount: 18,
     partnerRating: 4.7,
     product: {
-      id: productDetails[4].id,
-      title: productDetails[4].title,
-      image: productDetails[4].image,
+      id: 5,
+      title: "귀멸의 칼날 렌고쿠 아크릴 스탠드",
+      image: productImage,
     },
     price: 18000,
     tradeMethod: "direct",

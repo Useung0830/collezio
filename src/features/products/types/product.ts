@@ -29,20 +29,6 @@ export interface CreateProductInput {
   images: ProductImage[];
 }
 
-export interface ProductSeller {
-  id: number;
-  nickname: string;
-  tradeCount: number;
-  rating: number;
-  profileImageUrl: string;
-}
-
-export interface ProductDetailMetrics {
-  favoriteCount: number;
-  offerCount: number;
-  chatCount: number;
-}
-
 export interface ProductListItem {
   id: number | string;
   title: string;
@@ -58,18 +44,6 @@ export type ProductStatus = "available" | "reserved" | "completed";
 export interface MyProductListItem extends ProductListItem {
   id: string;
   status: ProductStatus | null;
-}
-
-export interface ProductDetail {
-  id: number;
-  title: string;
-  category: string;
-  createdAt: string;
-  description: string;
-  image: StaticImageData;
-  transaction: ProductTransaction;
-  seller: ProductSeller;
-  metrics: ProductDetailMetrics;
 }
 
 export interface RegisteredProductDetail extends MyProductListItem {
