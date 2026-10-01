@@ -53,7 +53,11 @@ export default function RegisteredChatRoom({
     );
   return (
     <div className="text-black-900 mx-auto flex h-[calc(100dvh-7rem)] min-h-100 w-full max-w-156 flex-col overflow-hidden bg-white">
-      <ChatRoomHeader chatRoom={query.data} />
+      <ChatRoomHeader
+        key={`${roomId}:${query.userId}`}
+        chatRoom={query.data}
+        userId={query.userId}
+      />
       <ChatProductSummary chatRoom={query.data} />
       <ChatConversation
         key={`${roomId}:${query.userId}`}

@@ -91,6 +91,43 @@ async function createProduct(
   return productId;
 }
 
+test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 유지된다", async ({
+  page,
+  request,
+}) => {
+  const requester = await createAccount(request, "신고 신청자");
+  const seller = await createAccount(request, "신고 판매자");
+  const productId = await createProduct(request, seller.userId, "sale");
+  await login(page, requester);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await page.getByRole("button", { name: "채팅 더보기" }).click();
+  await page.getByRole("button", { name: "신고하기", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "사용자 신고" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("기타", { exact: true }).check();
+  await expect(
+    dialog.getByRole("button", { name: "신고 제출" }),
+  ).toBeDisabled();
+  await dialog
+    .getByLabel("상세 내용 (필수)")
+    .fill("상품 설명과 거래 조건이 다릅니다.");
+  await dialog.getByRole("button", { name: "신고 제출" }).click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "신고가 접수되었습니다.",
+  );
+  await dialog.getByRole("button", { name: "확인", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+  const reports = await request.get(
+    `${documentsUrl}/users/${requester.userId}/chatReports`,
+    { headers: ownerHeaders },
+  );
+  const documents = (await reports.json()).documents;
+  expect(documents).toHaveLength(1);
+  expect(documents[0].fields.partnerId.stringValue).toBe(seller.userId);
+});
+
 test("채팅 목록에서 뒤로가면 채팅을 시작한 상품 상세로 돌아간다", async ({
   page,
   request,
