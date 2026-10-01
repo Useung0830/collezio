@@ -20,7 +20,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - 업로드 허가 문서는 `chatRooms/{roomId}/imageUploads/{imageMessageId}`에 저장하며 10분 동안 유효합니다. 차단 시 새 허가와 메시지 확정을 거부합니다. 이미 발급된 허가로 진행 중인 업로드가 완료되더라도 차단 후 메시지 확정은 거부됩니다.
 - 실패 시 입력과 요청 ID를 유지합니다. 재시도는 업로드된 파일의 SHA-256을 확인해 재사용하며 전송된 이미지는 덮어쓰거나 삭제하지 않습니다. 실패 후 화면을 떠나면 미확정 파일·허가 문서가 남을 수 있으며 자동 정리는 후속 작업입니다.
 - 배포 시 `firebase deploy --only firestore:rules,storage --project <project-id>`를 실행해야 합니다. 인증 다운로드를 위해 Storage 버킷의 CORS에서 앱의 origin과 GET 요청을 허용해야 합니다. 에뮬레이터 검증과 실제 Firebase 배포 후 검증을 구분합니다.
-- `storage.cors.json`은 로컬 3000 포트의 GET만 허용합니다. 서비스 배포 전 실제 서비스 origin을 추가한 뒤 `gcloud storage buckets update gs://<bucket-name> --cors-file=storage.cors.json`으로 적용하세요. 기존 버킷 설정이 있다면 먼저 병합해야 합니다. CORS는 Firebase 규칙 배포에 포함되지 않으며, 누락 시 업로드는 성공해도 이미지 조회는 실패할 수 있습니다. [Firebase 다운로드 및 CORS 안내](https://firebase.google.com/docs/storage/web/download-files#cors_configuration)
+- `storage.cors.json`은 로컬 3000 포트와 `https://collezio.vercel.app`의 GET을 허용합니다. 서비스 도메인이 바뀌면 새 origin을 추가한 뒤 `gcloud storage buckets update gs://<bucket-name> --cors-file=storage.cors.json`으로 적용하세요. 기존 버킷 설정이 있다면 먼저 병합해야 합니다. CORS는 Firebase 규칙 배포에 포함되지 않으며, 누락 시 업로드는 성공해도 이미지 조회는 실패할 수 있습니다. [Firebase 다운로드 및 CORS 안내](https://firebase.google.com/docs/storage/web/download-files#cors_configuration)
 - 긴 텍스트는 내부 스크롤을 유지하고 스크롤바만 숨깁니다. Enter는 전송, Shift+Enter는 줄바꿈이며 한글 조합 중 Enter는 전송하지 않습니다.
 
 검증 명령:
