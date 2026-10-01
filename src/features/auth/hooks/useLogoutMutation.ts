@@ -1,9 +1,11 @@
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 
 import { logoutAccount } from "@/features/auth/api/logoutAccount";
 
 export function useLogoutMutation() {
+  const router = useRouter();
   const isRunning = useRef(false);
   const mutation = useMutation({
     mutationFn: logoutAccount,
@@ -17,6 +19,7 @@ export function useLogoutMutation() {
     isRunning.current = true;
     try {
       await mutation.mutateAsync();
+      router.replace("/");
       return true;
     } catch {
       return false;
