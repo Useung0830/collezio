@@ -15,7 +15,7 @@ service firebase.storage {
           && request.time < ticket.createdAt + duration.value(10, 'm');
       }
       allow get: if canRead();
-      allow create: if request.auth != null && request.auth.uid == userId
+      allow create: if request.auth != null && request.auth.uid == userId && resource == null
         && hasUploadTicket() && messageId.matches('^[a-zA-Z0-9-]+-0$')
         && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
         && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];

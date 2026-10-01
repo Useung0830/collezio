@@ -6,6 +6,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+import { uploadChatImage } from "@/features/chat/api/uploadChatImage";
 import { validateChatAccess } from "@/features/chat/api/validateChatAccess";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/features/chat/constants/chat";
 import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
@@ -23,15 +24,30 @@ export async function sendChatMessage({
   messageId,
   userId,
   content,
+  image,
 }: SendChatMessageInput) {
   for (const id of [roomId, messageId, userId]) validateChatDocumentId(id);
   const text = content.trim();
-  if (!text || text.length > MAX_CHAT_MESSAGE_LENGTH || messageId.length > 128)
+  if (
+    (!text && !image) ||
+    text.length > MAX_CHAT_MESSAGE_LENGTH ||
+    messageId.length > 126
+  )
     throw new Error("메시지는 1~2,000자로 입력해주세요.");
   await firebaseAuth.authStateReady();
   validateFirebaseUser(userId);
   const roomRef = doc(firebaseDb, "chatRooms", roomId);
-  const messageRef = doc(roomRef, "messages", messageId);
+  const imageId = `${messageId}-0`;
+  const finalId = image ? (text ? `${messageId}-1` : imageId) : messageId;
+  const imagePath = image
+    ? await uploadChatImage(roomId, userId, imageId, image)
+    : null;
+  const messageRef = doc(roomRef, "messages", finalId);
+  const payload = {
+    content: text || "사진",
+    ...(imagePath && !text ? { imagePath } : {}),
+    ...(imagePath && text ? { previousMessageId: imageId } : {}),
+  };
   let observed:
     | {
         productId: string;
@@ -56,11 +72,13 @@ export async function sendChatMessage({
             throw new Error("채팅방에 참여할 수 없습니다.");
           // 응답이 끊긴 뒤 같은 전송을 재시도해도 이미 저장된 메시지를 재사용합니다.
           if (messageSnapshot.exists()) {
-            const existing = parseChatMessage(
-              messageId,
-              messageSnapshot.data(),
-            );
-            if (existing.senderId !== userId || existing.content !== text)
+            const existing = parseChatMessage(finalId, messageSnapshot.data());
+            if (
+              existing.senderId !== userId ||
+              existing.content !== payload.content ||
+              existing.imagePath !== payload.imagePath ||
+              existing.previousMessageId !== payload.previousMessageId
+            )
               throw new Error("메시지 전송 정보가 일치하지 않습니다.");
             return room.productId;
           }
@@ -96,15 +114,22 @@ export async function sendChatMessage({
             transaction.update(productRef, { chatCount: count + 1 });
           }
           const message = {
-            content: text,
+            ...payload,
             senderId: userId,
             createdAt: serverTimestamp(),
           };
+          if (imagePath && text)
+            transaction.set(doc(roomRef, "messages", imageId), {
+              content: "사진",
+              imagePath,
+              senderId: userId,
+              createdAt: serverTimestamp(),
+            });
           transaction.set(messageRef, message);
           transaction.update(roomRef, {
             status: "active",
             visibleTo: [room.requesterId, room.sellerId],
-            lastMessage: { id: messageId, ...message },
+            lastMessage: { id: finalId, ...message },
           });
           return room.productId;
         },

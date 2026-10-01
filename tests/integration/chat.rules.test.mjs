@@ -25,12 +25,19 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import {
+  connectStorageEmulator,
+  deleteObject,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
   assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST);
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "demo-collezio";
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "demo-key";
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "demo-collezio.appspot.com";
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
       if (specifier === "client-only")
@@ -43,7 +50,7 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       return nextResolve(specifier, context);
     },
   });
-  const { firebaseApp, firebaseAuth, firebaseDb } =
+  const { firebaseApp, firebaseAuth, firebaseDb, firebaseStorage } =
     await import("../../src/lib/firebase.ts");
   const { createChatRoom } =
     await import("../../src/features/chat/api/createChatRoom.ts");
@@ -87,6 +94,9 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     connectFirestoreEmulator(db, host, Number(port));
   }
   const denied = (error) => error.code === "permission-denied";
+  const [storageHost, storagePort] =
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST.split(":");
+  connectStorageEmulator(firebaseStorage, storageHost, Number(storagePort));
   const register = (auth) =>
     createUserWithEmailAndPassword(
       auth,
@@ -631,6 +641,89 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
           content: "해제 후 전송",
         });
         assert.equal((await getChatMessages(roomId, user.uid)).length, 5);
+      },
+    );
+
+    await t.test(
+      "이미지와 텍스트는 순서대로 원자적으로 저장하고 재시도 시 중복되지 않는다",
+      async () => {
+        const imageRoomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const image = new File(
+          [new Uint8Array([137, 80, 78, 71])],
+          "test.png",
+          { type: "image/png" },
+        );
+        const input = {
+          roomId: imageRoomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "사진 설명",
+          image,
+        };
+        await sendChatMessage(input);
+        await sendChatMessage(input);
+        const messages = await getChatMessages(imageRoomId, user.uid);
+        assert.equal(messages.length, 2);
+        assert.equal(messages[0].id, `${input.messageId}-0`);
+        assert.equal(messages[1].id, `${input.messageId}-1`);
+        assert.equal(messages[0].content, "사진");
+        assert.equal(messages[1].content, "사진 설명");
+        assert.equal(messages[1].previousMessageId, messages[0].id);
+        const path = messages[0].imagePath;
+        for (const [auth, expected] of [
+          [firebaseAuth, 200],
+          [sellerAuth, 200],
+          [strangerAuth, 403],
+        ]) {
+          const response = await fetch(
+            `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(path)}?alt=media`,
+            {
+              headers: {
+                Authorization: `Firebase ${await auth.currentUser.getIdToken()}`,
+              },
+            },
+          );
+          assert.equal(response.status, expected);
+        }
+        await assert.rejects(deleteObject(ref(firebaseStorage, path)));
+        await assert.rejects(
+          uploadBytes(ref(firebaseStorage, path), new Uint8Array([1]), {
+            contentType: "image/png",
+          }),
+        );
+        await assert.rejects(
+          sendChatMessage({
+            ...input,
+            image: new File([new Uint8Array([1, 2, 3, 4])], "test.png", {
+              type: "image/png",
+            }),
+          }),
+        );
+        await sendChatMessage({
+          ...input,
+          messageId: randomUUID(),
+          content: "",
+        });
+        assert.equal((await getChatMessages(imageRoomId, user.uid)).length, 3);
+        await updateChatBlock({
+          userId: user.uid,
+          partnerId: seller.uid,
+          roomId: imageRoomId,
+          isBlocked: true,
+        });
+        await assert.rejects(
+          sendChatMessage({ ...input, messageId: randomUUID() }),
+        );
+        assert.equal((await getChatMessages(imageRoomId, user.uid)).length, 3);
+        await updateChatBlock({
+          userId: user.uid,
+          partnerId: seller.uid,
+          roomId: imageRoomId,
+          isBlocked: false,
+        });
       },
     );
 
