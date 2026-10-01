@@ -58,6 +58,28 @@ PR 코드를 체크아웃하거나 실행하는 단계를 이 워크플로우에
 병합 기준으로 삼는다. 향후 병합 후 배포 워크플로우를 추가할 때는 실행 방식을
 별도로 구성한다.
 
+### PR 브랜치 자동 업데이트
+
+`.github/workflows/auto-update-pr.yml`은 자동 병합이 켜진 같은 저장소의
+`dev` 대상 일반 PR에 최신 `dev`를 병합한다. Draft, 외부 fork, `main`·`dev`
+브랜치에서 만든 PR은 제외하며, 충돌은 직접 해결한다.
+
+- `dev`의 **Require branches to be up to date before merging**을 활성화한다.
+- `dev` push, CI·Auto Merge 완료, 수동 실행 및 10분 간격 예약 실행으로 확인한다.
+  GitHub 예약 실행은 지연될 수 있으므로 즉시 업데이트를 보장하지 않는다.
+- 기본 `GITHUB_TOKEN`으로 업데이트한 뒤 `ci.yml`을 `workflow_dispatch`로
+  명시적으로 실행한다. 별도 PAT나 GitHub App 비밀 키는 필요하지 않다.
+- 업데이트 완료 후 새 커밋을 확인하고 CI를 요청한다. 동일 커밋의 dispatch
+  실행이 있으면 중복 요청하지 않으며, 실패한 CI는 자동으로 반복 실행하지 않는다.
+  일반 PR CI와 최초 dispatch CI가 함께 실행될 수 있다.
+- API 업데이트만 성공하고 CI 요청이 실패해도 다음 실행에서 누락된 요청을 복구한다.
+- 업데이트 작업에는 PR 코드 checkout이나 실행을 추가하지 않는다.
+  `actions: write`는 CI 실행 요청에 사용하며, 실제 CI는 기존 읽기 권한으로 실행한다.
+- 이 워크플로는 기본 브랜치인 `dev`에 병합된 뒤 활성화된다. 도입 PR 자체가
+  뒤처진 경우에는 한 번 수동으로 Update branch를 실행해야 한다.
+
+참고: [GitHub 토큰과 후속 워크플로 실행](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
+
 ## dev에서 main으로 병합
 
 배포할 시점에는 `dev`를 `main`에 Merge Commit으로 병합한다. 기능 단위 커밋을
