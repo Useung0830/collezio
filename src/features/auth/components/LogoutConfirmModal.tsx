@@ -22,6 +22,12 @@ export default function LogoutConfirmModal({
     if (await logout()) onConfirm();
   };
 
+  const handleCancel = () => {
+    if (isPending) return;
+    dialogRef.current?.close();
+    onCancel();
+  };
+
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal();
@@ -53,7 +59,7 @@ export default function LogoutConfirmModal({
       }}
       onCancel={(event) => {
         event.preventDefault();
-        if (!isPending) onCancel();
+        handleCancel();
       }}
       onClick={(event) => {
         if (event.target !== event.currentTarget || isPending) return;
@@ -64,7 +70,7 @@ export default function LogoutConfirmModal({
           event.clientY < rect.top ||
           event.clientY > rect.bottom
         )
-          onCancel();
+          handleCancel();
       }}
       className="text-black-900 m-auto w-[calc(100%-2rem)] max-w-90 rounded-2xl bg-white p-6 shadow-xl backdrop:bg-black/40"
     >
@@ -77,7 +83,7 @@ export default function LogoutConfirmModal({
         </p>
       )}
       <div className="mt-6 grid grid-cols-2 gap-2">
-        <Button size="sm" autoFocus disabled={isPending} onClick={onCancel}>
+        <Button size="sm" disabled={isPending} onClick={handleCancel}>
           취소
         </Button>
         <Button
