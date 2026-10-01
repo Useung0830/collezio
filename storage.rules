@@ -2,6 +2,38 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    match /chat/{roomId}/{userId}/{messageId} {
+      function canRead() {
+        let room = firestore.get(/databases/(default)/documents/chatRooms/$(roomId)).data;
+        return request.auth != null && request.auth.uid in room.visibleTo
+          && (request.auth.uid == userId ||
+            firestore.exists(/databases/(default)/documents/chatRooms/$(roomId)/messages/$(messageId)));
+      }
+      function hasUploadTicket() {
+        let ticket = firestore.get(/databases/(default)/documents/chatRooms/$(roomId)/imageUploads/$(messageId)).data;
+        return ticket.senderId == request.auth.uid
+          && request.time < ticket.createdAt + duration.value(10, 'm');
+      }
+      allow get: if canRead();
+      allow create: if request.auth != null && request.auth.uid == userId && resource == null
+        && hasUploadTicket() && messageId.matches('^[a-zA-Z0-9-]+-0$')
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+      allow delete: if request.auth != null && request.auth.uid == userId
+        && !firestore.exists(/databases/(default)/documents/chatRooms/$(roomId)/messages/$(messageId));
+      match /{imageIndex} {
+        allow get: if request.auth != null
+          && request.auth.uid in firestore.get(/databases/(default)/documents/chatRooms/$(roomId)).data.visibleTo
+          && (request.auth.uid == userId || ('chat/' + roomId + '/' + userId + '/' + messageId + '/' + imageIndex)
+            in firestore.get(/databases/(default)/documents/chatRooms/$(roomId)/messages/$(messageId)).data.imagePaths);
+        allow create: if request.auth != null && request.auth.uid == userId && resource == null
+          && hasUploadTicket() && messageId.matches('^[a-zA-Z0-9-]+-0$') && imageIndex.matches('^[0-9]$')
+          && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+          && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+        allow delete: if request.auth != null && request.auth.uid == userId
+          && !firestore.exists(/databases/(default)/documents/chatRooms/$(roomId)/messages/$(messageId));
+      }
+    }
     match /community/{userId}/{postId}/{imageId} {
       function isOwner() {
         return request.auth != null && request.auth.uid == userId

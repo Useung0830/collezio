@@ -32,9 +32,20 @@ if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
   }
 
   if (typeof window !== "undefined" && !firebaseAuth.emulatorConfig) {
-    connectAuthEmulator(firebaseAuth, "http://127.0.0.1:9099");
-    connectFirestoreEmulator(firebaseDb, "127.0.0.1", 8080);
-    connectStorageEmulator(firebaseStorage, "127.0.0.1", 9199);
+    connectAuthEmulator(
+      firebaseAuth,
+      `http://127.0.0.1:${process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_PORT || "9099"}`,
+    );
+    connectFirestoreEmulator(
+      firebaseDb,
+      "127.0.0.1",
+      Number(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || 8080),
+    );
+    connectStorageEmulator(
+      firebaseStorage,
+      "127.0.0.1",
+      Number(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_EMULATOR_PORT || 9199),
+    );
     connectFunctionsEmulator(firebaseFunctions, "127.0.0.1", 5001);
   }
 }

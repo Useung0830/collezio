@@ -25,12 +25,19 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
+import {
+  connectStorageEmulator,
+  deleteObject,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
   assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST);
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "demo-collezio";
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY = "demo-key";
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "demo-collezio.appspot.com";
   const hooks = registerHooks({
     resolve(specifier, context, nextResolve) {
       if (specifier === "client-only")
@@ -43,7 +50,7 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       return nextResolve(specifier, context);
     },
   });
-  const { firebaseApp, firebaseAuth, firebaseDb } =
+  const { firebaseApp, firebaseAuth, firebaseDb, firebaseStorage } =
     await import("../../src/lib/firebase.ts");
   const { createChatRoom } =
     await import("../../src/features/chat/api/createChatRoom.ts");
@@ -87,20 +94,26 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     connectFirestoreEmulator(db, host, Number(port));
   }
   const denied = (error) => error.code === "permission-denied";
+  const [storageHost, storagePort] =
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST.split(":");
+  connectStorageEmulator(firebaseStorage, storageHost, Number(storagePort));
   const register = (auth) =>
     createUserWithEmailAndPassword(
       auth,
       `${randomUUID()}@example.com`,
       "Test1234!",
     );
-  const newProduct = (db, sellerId) => {
+  const newProduct = (db, sellerId, kind = "sale") => {
     const ref = doc(collection(db, "products"));
     return setDoc(ref, {
       title: "채팅 테스트 상품",
       description: "상품별 채팅 확인",
       sellerId,
       status: "available",
-      transaction: { type: "sale", price: 12000 },
+      transaction:
+        kind === "sale"
+          ? { type: "sale", price: 12000 }
+          : { type: "exchange", desiredItemName: "교환 상품" },
       delivery: { type: "parcel", shippingFee: 0 },
       images: [
         { url: "https://example.com/product.png", path: "test/product" },
@@ -631,6 +644,469 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
           content: "해제 후 전송",
         });
         assert.equal((await getChatMessages(roomId, user.uid)).length, 5);
+      },
+    );
+
+    await t.test(
+      "이미지와 텍스트는 순서대로 원자적으로 저장하고 재시도 시 중복되지 않는다",
+      async () => {
+        const imageRoomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const image = new File(
+          [new Uint8Array([137, 80, 78, 71])],
+          "test.png",
+          { type: "image/png" },
+        );
+        const input = {
+          roomId: imageRoomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "사진 설명",
+          image,
+        };
+        await sendChatMessage(input);
+        await sendChatMessage(input);
+        const messages = await getChatMessages(imageRoomId, user.uid);
+        assert.equal(messages.length, 2);
+        assert.equal(messages[0].id, `${input.messageId}-0`);
+        assert.equal(messages[1].id, `${input.messageId}-1`);
+        assert.equal(messages[0].content, "사진");
+        assert.equal(messages[1].content, "사진 설명");
+        assert.equal(messages[1].previousMessageId, messages[0].id);
+        const path = messages[0].imagePath;
+        for (const [auth, expected] of [
+          [firebaseAuth, 200],
+          [sellerAuth, 200],
+          [strangerAuth, 403],
+        ]) {
+          const response = await fetch(
+            `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(path)}?alt=media`,
+            {
+              headers: {
+                Authorization: `Firebase ${await auth.currentUser.getIdToken()}`,
+              },
+            },
+          );
+          assert.equal(response.status, expected);
+        }
+        await assert.rejects(deleteObject(ref(firebaseStorage, path)));
+        await assert.rejects(
+          uploadBytes(ref(firebaseStorage, path), new Uint8Array([1]), {
+            contentType: "image/png",
+          }),
+        );
+        await assert.rejects(
+          sendChatMessage({
+            ...input,
+            image: new File([new Uint8Array([1, 2, 3, 4])], "test.png", {
+              type: "image/png",
+            }),
+          }),
+        );
+        await sendChatMessage({
+          ...input,
+          messageId: randomUUID(),
+          content: "",
+        });
+        assert.equal((await getChatMessages(imageRoomId, user.uid)).length, 3);
+        await updateChatBlock({
+          userId: user.uid,
+          partnerId: seller.uid,
+          roomId: imageRoomId,
+          isBlocked: true,
+        });
+        await assert.rejects(
+          sendChatMessage({ ...input, messageId: randomUUID() }),
+        );
+        assert.equal((await getChatMessages(imageRoomId, user.uid)).length, 3);
+        await updateChatBlock({
+          userId: user.uid,
+          partnerId: seller.uid,
+          roomId: imageRoomId,
+          isBlocked: false,
+        });
+      },
+    );
+
+    await t.test(
+      "사진 10장은 한 메시지로 저장하고 묶음 권한과 개수 제한을 검증한다",
+      async () => {
+        const roomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const images = Array.from(
+          { length: 10 },
+          (_, index) =>
+            new File([new Uint8Array([137, 80, 78, index])], `${index}.png`, {
+              type: "image/png",
+            }),
+        );
+        const input = {
+          roomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "묶음 설명",
+          images,
+        };
+        await sendChatMessage(input);
+        await sendChatMessage(input);
+        const messages = await getChatMessages(roomId, user.uid);
+        assert.equal(messages.length, 2);
+        assert.equal(messages[0].imagePaths.length, 10);
+        assert.equal(messages[1].previousMessageId, messages[0].id);
+        for (const path of messages[0].imagePaths) {
+          for (const [auth, expected] of [
+            [sellerAuth, 200],
+            [strangerAuth, 403],
+          ]) {
+            const response = await fetch(
+              `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(path)}?alt=media`,
+              {
+                headers: {
+                  Authorization: `Firebase ${await auth.currentUser.getIdToken()}`,
+                },
+              },
+            );
+            assert.equal(response.status, expected);
+          }
+        }
+        await assert.rejects(
+          sendChatMessage({
+            ...input,
+            messageId: randomUUID(),
+            images: [...images, images[0]],
+          }),
+          /10/,
+        );
+        await sendChatMessage({
+          ...input,
+          messageId: randomUUID(),
+          content: "",
+          images: images.slice(0, 3),
+        });
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 3);
+        const batch = writeBatch(firebaseDb);
+        const invalidId = `${randomUUID()}-0`;
+        const invalid = {
+          senderId: user.uid,
+          content: "사진",
+          createdAt: serverTimestamp(),
+          imagePaths: messages[0].imagePaths,
+        };
+        batch.set(
+          doc(firebaseDb, "chatRooms", roomId, "messages", invalidId),
+          invalid,
+        );
+        batch.update(doc(firebaseDb, "chatRooms", roomId), {
+          lastMessage: { id: invalidId, ...invalid },
+        });
+        await assert.rejects(batch.commit(), denied);
+      },
+    );
+
+    await t.test(
+      "거래 제안은 첫 메시지로 공개되며 재시도와 중복 대기를 막는다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const proposalRoomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const terms = {
+          kind: "sale",
+          amount: 12000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "강남역",
+          shippingPayer: "requester",
+          notes: "거래 제안 테스트",
+        };
+        const id = randomUUID();
+        await createTradeProposal(proposalRoomId, user.uid, id, terms, null);
+        await createTradeProposal(proposalRoomId, user.uid, id, terms, null);
+        assert.equal(
+          (await getChatMessages(proposalRoomId, user.uid)).length,
+          1,
+        );
+        assert.equal(
+          (await getChatMessages(proposalRoomId, user.uid))[0].proposalId,
+          id,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(sellerDb, "chatRooms", proposalRoomId, "proposals", id),
+            )
+          ).data().status,
+          "pending",
+        );
+        await assert.rejects(
+          getDocFromServer(
+            doc(strangerDb, "chatRooms", proposalRoomId, "proposals", id),
+          ),
+          denied,
+        );
+        await assert.rejects(
+          createTradeProposal(
+            proposalRoomId,
+            user.uid,
+            randomUUID(),
+            terms,
+            null,
+          ),
+          /응답 대기/,
+        );
+      },
+    );
+
+    await t.test(
+      "제안 수락은 상품을 예약하고 재응답과 임의 예약을 거부한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid);
+        const roomId = await createChatRoom({ productId, userId: user.uid });
+        const terms = {
+          kind: "sale",
+          amount: 10000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "parcel",
+          scheduledAt: Date.now() + 86400000,
+          location: "",
+          shippingPayer: "seller",
+          notes: "",
+        };
+        const id = randomUUID();
+        await createTradeProposal(roomId, user.uid, id, terms, null);
+        await assert.rejects(
+          respondToTradeProposal(roomId, user.uid, id, "accepted"),
+          /권한/,
+        );
+        await assert.rejects(
+          updateDoc(doc(firebaseDb, "products", productId), {
+            status: "reserved",
+            reservedByRoomId: roomId,
+          }),
+          denied,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, id, "accepted");
+        await respondToTradeProposal(roomId, seller.uid, id, "accepted");
+        await assert.rejects(
+          respondToTradeProposal(roomId, seller.uid, id, "rejected"),
+          /이미 처리/,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().status,
+          "reserved",
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        await assert.rejects(
+          respondToTradeProposal(roomId, user.uid, id, "withdrawn"),
+          /이미 처리/,
+        );
+      },
+    );
+
+    await t.test(
+      "교환 조건 변경은 기존 예약을 유지하고 수락 시 교환 상품을 교체한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid, "exchange");
+        const firstProduct = await newProduct(firebaseDb, user.uid);
+        const secondProduct = await newProduct(firebaseDb, user.uid);
+        const roomId = await createChatRoom({ productId, userId: user.uid });
+        const terms = {
+          kind: "exchange",
+          amount: 0,
+          exchangeProductId: firstProduct,
+          extraAmount: 1000,
+          extraPayer: "seller",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "서울역",
+          shippingPayer: "each",
+          notes: "",
+        };
+        const first = randomUUID();
+        await createTradeProposal(roomId, user.uid, first, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, first, "accepted");
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        const rejected = randomUUID();
+        await createTradeProposal(
+          roomId,
+          user.uid,
+          rejected,
+          { ...terms, exchangeProductId: secondProduct },
+          first,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", firstProduct))
+          ).data().status,
+          "reserved",
+        );
+        await respondToTradeProposal(roomId, user.uid, rejected, "withdrawn");
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(firebaseDb, "chatRooms", roomId, "trade", "state"),
+            )
+          ).data().acceptedId,
+          first,
+        );
+        const next = randomUUID();
+        await createTradeProposal(
+          roomId,
+          user.uid,
+          next,
+          { ...terms, exchangeProductId: secondProduct },
+          first,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(roomId, seller.uid, next, "accepted");
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", firstProduct))
+          ).data().status,
+          "available",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", secondProduct))
+          ).data().status,
+          "reserved",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(
+              doc(firebaseDb, "chatRooms", roomId, "proposals", first),
+            )
+          ).data().status,
+          "superseded",
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+      },
+    );
+
+    await t.test(
+      "동일 상품의 다른 채팅 예약 충돌과 수락·거절 동시 응답을 처리한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid);
+        const terms = {
+          kind: "sale",
+          amount: 10000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "서울역",
+          shippingPayer: "requester",
+          notes: "",
+        };
+        const firstRoom = await createChatRoom({ productId, userId: user.uid });
+        const first = randomUUID();
+        await createTradeProposal(firstRoom, user.uid, first, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          stranger.email,
+          "Test1234!",
+        );
+        const secondRoom = await createChatRoom({
+          productId,
+          userId: stranger.uid,
+        });
+        const second = randomUUID();
+        await createTradeProposal(
+          secondRoom,
+          stranger.uid,
+          second,
+          terms,
+          null,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(firstRoom, seller.uid, first, "accepted");
+        await assert.rejects(
+          respondToTradeProposal(secondRoom, seller.uid, second, "accepted"),
+          /예약/,
+        );
+        await respondToTradeProposal(
+          secondRoom,
+          seller.uid,
+          second,
+          "rejected",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().reservedByRoomId,
+          firstRoom,
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        const raceRoom = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const raceId = randomUUID();
+        await createTradeProposal(raceRoom, user.uid, raceId, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        const results = await Promise.allSettled([
+          respondToTradeProposal(raceRoom, seller.uid, raceId, "accepted"),
+          respondToTradeProposal(raceRoom, seller.uid, raceId, "rejected"),
+        ]);
+        assert.equal(
+          results.filter((result) => result.status === "fulfilled").length,
+          1,
+        );
+        const state = (
+          await getDocFromServer(
+            doc(firebaseDb, "chatRooms", raceRoom, "trade", "state"),
+          )
+        ).data();
+        assert.equal(state.pendingId, null);
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
       },
     );
 
