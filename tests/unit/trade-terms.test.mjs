@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { validateTradeTerms } from "../../src/features/chat/utils/validateTradeTerms.ts";
 
 const now = Date.now();
