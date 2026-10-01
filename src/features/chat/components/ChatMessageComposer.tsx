@@ -168,7 +168,7 @@ export default function ChatMessageComposer({
               maxLength={MAX_CHAT_MESSAGE_LENGTH}
               rows={1}
               placeholder="메시지를 입력해 주세요"
-              className="text-body-14 text-black-900 placeholder:text-black-400 [field-sizing:content] max-h-28 min-h-5 w-full resize-none bg-transparent py-1 outline-none disabled:opacity-50"
+              className="text-body-14 text-black-900 placeholder:text-black-400 [field-sizing:content] max-h-28 min-h-5 w-full resize-none [scrollbar-width:none] overflow-y-auto bg-transparent py-1 outline-none disabled:opacity-50 [&::-webkit-scrollbar]:hidden"
             />
           </label>
           <button
