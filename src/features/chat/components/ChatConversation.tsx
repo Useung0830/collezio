@@ -1,6 +1,7 @@
 "use client";
 
 import Button from "@/components/common/button/Button";
+import ChatBlockNotice from "@/features/chat/components/ChatBlockNotice";
 import ChatMessageComposer from "@/features/chat/components/ChatMessageComposer";
 import ChatMessageList from "@/features/chat/components/ChatMessageList";
 import { useChatMessagesQuery } from "@/features/chat/hooks/useChatMessagesQuery";
@@ -8,11 +9,13 @@ import { useChatMessagesQuery } from "@/features/chat/hooks/useChatMessagesQuery
 interface ChatConversationProps {
   roomId: string;
   userId: string;
+  partnerId: string;
 }
 
 export default function ChatConversation({
   roomId,
   userId,
+  partnerId,
 }: ChatConversationProps) {
   const query = useChatMessagesQuery(roomId, userId);
   return (
@@ -44,11 +47,13 @@ export default function ChatConversation({
           <p>첫 메시지를 보내면 상대방의 채팅 목록에도 표시됩니다.</p>
         </div>
       )}
-      <ChatMessageComposer
-        roomId={roomId}
-        userId={userId}
-        disabled={query.isPending || query.isError}
-      />
+      <ChatBlockNotice roomId={roomId} userId={userId} partnerId={partnerId}>
+        <ChatMessageComposer
+          roomId={roomId}
+          userId={userId}
+          disabled={query.isPending || query.isError}
+        />
+      </ChatBlockNotice>
     </section>
   );
 }

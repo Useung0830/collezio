@@ -3,17 +3,19 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 
+import ChatRoomActions from "@/features/chat/components/ChatRoomActions";
 import type { ChatRoomView } from "@/features/chat/types/registeredChatRoom";
 import ProfileAvatar from "@/features/user/components/ProfileAvatar";
 
-import BlockIcon from "@/assets/icons/icon-block.svg";
 import KebabIcon from "@/assets/icons/icon-kebab.svg";
 import RightIcon from "@/assets/icons/icon-right.svg";
-import SirenIcon from "@/assets/icons/icon-siren.svg";
 
-type ChatRoomHeaderProps = { chatRoom: ChatRoomView };
+type ChatRoomHeaderProps = { chatRoom: ChatRoomView; userId: string };
 
-export default function ChatRoomHeader({ chatRoom }: ChatRoomHeaderProps) {
+export default function ChatRoomHeader({
+  chatRoom,
+  userId,
+}: ChatRoomHeaderProps) {
   const actionsId = useId();
   const [isActionsOpen, setIsActionsOpen] = useState(false);
 
@@ -58,30 +60,17 @@ export default function ChatRoomHeader({ chatRoom }: ChatRoomHeaderProps) {
         hidden={!isActionsOpen}
         className="text-body-14 text-black-900 shrink-0 pb-3"
       >
-        <div
-          role="group"
-          aria-label="채팅 관리"
-          className="flex items-center justify-center gap-3"
-        >
-          <button
-            type="button"
-            disabled
-            title="신고 기능 준비 중"
-            className="flex items-center gap-1 disabled:cursor-not-allowed"
-          >
-            <SirenIcon className="size-4" aria-hidden="true" />
-            신고하기
-          </button>
-          <button
-            type="button"
-            disabled
-            title="차단 기능 준비 중"
-            className="flex items-center gap-1 disabled:cursor-not-allowed"
-          >
-            <BlockIcon className="size-4" aria-hidden="true" />
-            차단하기
-          </button>
-        </div>
+        {isActionsOpen && (
+          <ChatRoomActions
+            roomId={chatRoom.id}
+            userId={userId}
+            partnerId={
+              chatRoom.requesterId === userId
+                ? chatRoom.sellerId
+                : chatRoom.requesterId
+            }
+          />
+        )}
       </div>
     </>
   );

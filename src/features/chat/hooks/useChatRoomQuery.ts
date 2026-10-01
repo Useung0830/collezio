@@ -20,6 +20,7 @@ export function useChatRoomQuery(roomId: string) {
     ...auth,
     isPending: query.isPending && !subscription.error,
     isError: query.isError || Boolean(subscription.error),
+    error: subscription.error ?? query.error,
     refetch: () => {
       subscription.restart();
       return query.refetch();

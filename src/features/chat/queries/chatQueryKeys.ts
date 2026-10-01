@@ -1,4 +1,10 @@
 export const chatQueryKeys = {
+  block: (userId: string | null | undefined, partnerId: string | null) => [
+    "chat",
+    "block",
+    userId,
+    partnerId,
+  ],
   messages: (roomId: string, userId: string | null | undefined) => [
     "chat",
     "messages",

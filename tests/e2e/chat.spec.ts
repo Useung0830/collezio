@@ -91,6 +91,214 @@ async function createProduct(
   return productId;
 }
 
+test("신고와 차단은 연결 실패 후 재시도할 수 있다", async ({
+  page,
+  request,
+  context,
+}) => {
+  const requester = await createAccount(request, "재시도 신고자");
+  const seller = await createAccount(request, "재시도 대상");
+  const productId = await createProduct(request, seller.userId, "exchange");
+  await login(page, requester);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "채팅 더보기" }).click();
+  await page.getByRole("button", { name: "신고하기", exact: true }).click();
+  let dialog = page.getByRole("dialog", { name: "사용자 신고" });
+  await dialog.getByLabel("스팸·광고", { exact: true }).check();
+  await dialog.getByLabel("상세 내용 (선택)").fill("반복 광고 메시지");
+  await page.screenshot({
+    path: "test-results/chat-report-mobile.png",
+    fullPage: true,
+  });
+  try {
+    await context.setOffline(true);
+    await dialog.getByRole("button", { name: "신고 제출" }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible({ timeout: 15000 });
+    await expect(dialog.getByLabel("상세 내용 (선택)")).toHaveValue(
+      "반복 광고 메시지",
+    );
+    await context.setOffline(false);
+    await dialog.getByRole("button", { name: "신고 다시 시도" }).click();
+    await expect(dialog.getByRole("status")).toContainText(
+      "신고가 접수되었습니다.",
+    );
+    await dialog.getByRole("button", { name: "확인", exact: true }).click();
+    await page.getByRole("button", { name: "차단하기", exact: true }).click();
+    dialog = page.getByRole("dialog", { name: "상대방을 차단할까요?" });
+    await page.screenshot({
+      path: "test-results/chat-block-mobile.png",
+      fullPage: true,
+    });
+    await context.setOffline(true);
+    await dialog
+      .getByRole("button", { name: "차단 확인", exact: true })
+      .click();
+    await expect(dialog.getByRole("alert")).toBeVisible({ timeout: 15000 });
+    await context.setOffline(false);
+    await dialog
+      .getByRole("button", { name: "차단 확인", exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+    await expect(
+      page.getByText("차단한 사용자입니다.", { exact: false }),
+    ).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
+  const reports = await request.get(
+    `${documentsUrl}/users/${requester.userId}/chatReports`,
+    { headers: ownerHeaders },
+  );
+  expect((await reports.json()).documents).toHaveLength(1);
+});
+
+test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 해제해야 전송된다", async ({
+  page,
+  request,
+  browser,
+}) => {
+  const requester = await createAccount(request, "차단 신청자");
+  const seller = await createAccount(request, "차단 판매자");
+  const productId = await createProduct(request, seller.userId, "sale");
+  const secondProductId = await createProduct(
+    request,
+    seller.userId,
+    "exchange",
+  );
+  const sellerContext = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  await sellerContext.route(
+    /^https:\/\/(identitytoolkit|securetoken|firestore)\.googleapis\.com\//,
+    (route) => route.abort(),
+  );
+  try {
+    await login(page, requester);
+    await page.goto(`/products/${productId}`);
+    await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+    await page.getByLabel("메시지", { exact: true }).fill("차단 전 대화");
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    await expect(page.getByText("차단 전 대화", { exact: true })).toBeVisible();
+    const roomUrl = page.url();
+    const otherTab = await page.context().newPage();
+    await otherTab.goto(roomUrl);
+    const sellerPage = await sellerContext.newPage();
+    await login(sellerPage, seller);
+    await sellerPage.goto(roomUrl);
+    await expect(
+      sellerPage.getByLabel("메시지", { exact: true }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "채팅 더보기" }).click();
+    await page.getByRole("button", { name: "차단하기", exact: true }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "취소" })
+      .click();
+    await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "차단하기", exact: true }).click();
+    await page.getByRole("button", { name: "차단 확인", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      otherTab.getByText("차단한 사용자입니다.", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      sellerPage.getByText("메시지를 보낼 수 없는 대화입니다."),
+    ).toBeVisible();
+    await expect(sellerPage.getByLabel("메시지", { exact: true })).toHaveCount(
+      0,
+    );
+    await expect(
+      sellerPage.getByText("차단 전 대화", { exact: true }),
+    ).toBeVisible();
+    await page.reload();
+    await expect(
+      page.getByText("차단한 사용자입니다.", { exact: false }),
+    ).toBeVisible();
+    await otherTab.goto(`/products/${secondProductId}`);
+    await expect(
+      otherTab.getByRole("button", { name: "채팅하기", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      otherTab.getByText("이 사용자와 새 대화를 시작할 수 없습니다.", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await sellerPage.getByRole("button", { name: "채팅 더보기" }).click();
+    await sellerPage
+      .getByRole("button", { name: "차단하기", exact: true })
+      .click();
+    await sellerPage
+      .getByRole("button", { name: "차단 확인", exact: true })
+      .click();
+    await expect(sellerPage.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "차단 해제", exact: true }).click();
+    await page
+      .getByRole("button", { name: "차단 해제 확인", exact: true })
+      .click();
+    await expect(
+      page.getByText("메시지를 보낼 수 없는 대화입니다."),
+    ).toBeVisible();
+    await sellerPage
+      .getByRole("group", { name: "채팅 관리" })
+      .getByRole("button", { name: "차단 해제", exact: true })
+      .click();
+    await sellerPage
+      .getByRole("button", { name: "차단 해제 확인", exact: true })
+      .click();
+    await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+    await expect(
+      otherTab.getByRole("button", { name: "채팅하기", exact: true }),
+    ).toBeEnabled();
+    await page.getByLabel("메시지", { exact: true }).fill("해제 후 대화");
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    await expect(
+      sellerPage.getByText("해제 후 대화", { exact: true }),
+    ).toBeVisible();
+    await otherTab.close();
+  } finally {
+    await sellerContext.close();
+  }
+});
+
+test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 유지된다", async ({
+  page,
+  request,
+}) => {
+  const requester = await createAccount(request, "신고 신청자");
+  const seller = await createAccount(request, "신고 판매자");
+  const productId = await createProduct(request, seller.userId, "sale");
+  await login(page, requester);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await page.getByRole("button", { name: "채팅 더보기" }).click();
+  await page.getByRole("button", { name: "신고하기", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "사용자 신고" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("기타", { exact: true }).check();
+  await expect(
+    dialog.getByRole("button", { name: "신고 제출" }),
+  ).toBeDisabled();
+  await dialog
+    .getByLabel("상세 내용 (필수)")
+    .fill("상품 설명과 거래 조건이 다릅니다.");
+  await dialog.getByRole("button", { name: "신고 제출" }).click();
+  await expect(dialog.getByRole("status")).toContainText(
+    "신고가 접수되었습니다.",
+  );
+  await dialog.getByRole("button", { name: "확인", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+  const reports = await request.get(
+    `${documentsUrl}/users/${requester.userId}/chatReports`,
+    { headers: ownerHeaders },
+  );
+  const documents = (await reports.json()).documents;
+  expect(documents).toHaveLength(1);
+  expect(documents[0].fields.partnerId.stringValue).toBe(seller.userId);
+});
+
 test("채팅 목록에서 뒤로가면 채팅을 시작한 상품 상세로 돌아간다", async ({
   page,
   request,

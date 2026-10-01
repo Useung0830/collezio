@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import Button from "@/components/common/button/Button";
 import LinkButton from "@/components/common/button/LinkButton";
+import { useChatBlockStatus } from "@/features/chat/hooks/useChatBlockStatus";
 import { useChatUser } from "@/features/chat/hooks/useChatUser";
 import { useCreateChatRoomMutation } from "@/features/chat/hooks/useCreateChatRoomMutation";
 import type { ProductTransaction } from "@/features/products/types/product";
@@ -24,12 +25,25 @@ export default function StartChatButton({
 }: StartChatButtonProps) {
   const router = useRouter();
   const { userId, isAuthLoading } = useChatUser();
+  const block = useChatBlockStatus(userId, sellerId);
   const mutation = useCreateChatRoomMutation();
   const [isLoginRequired, setIsLoginRequired] = useState(false);
   const isOwnProduct = Boolean(userId && userId === sellerId);
+  const isChatRestricted = Boolean(
+    userId &&
+    sellerId &&
+    !isOwnProduct &&
+    (block.isPending || block.isError || block.isBlocked),
+  );
 
   const handleStartChat = () => {
-    if (isAuthLoading || mutation.isPending || isOwnProduct || !sellerId)
+    if (
+      isAuthLoading ||
+      mutation.isPending ||
+      isOwnProduct ||
+      !sellerId ||
+      isChatRestricted
+    )
       return;
     if (!userId) {
       setIsLoginRequired(true);
@@ -54,12 +68,38 @@ export default function StartChatButton({
         size="lg"
         shape="rounded"
         className="w-full whitespace-nowrap"
-        disabled={isAuthLoading || isOwnProduct || !sellerId}
+        disabled={
+          isAuthLoading || isOwnProduct || !sellerId || isChatRestricted
+        }
         isLoading={mutation.isPending}
         onClick={handleStartChat}
       >
         채팅하기
       </Button>
+      {userId &&
+        sellerId &&
+        !isOwnProduct &&
+        (block.isError ? (
+          <div className="text-body-14 text-black-900">
+            <p role="alert">대화 가능 여부를 확인하지 못했습니다.</p>
+            <Button
+              size="sm"
+              disabled={block.isFetching}
+              onClick={() => void block.refetch()}
+            >
+              다시 확인
+            </Button>
+          </div>
+        ) : block.isBlocked ? (
+          <p className="text-body-14 text-black-900">
+            이 사용자와 새 대화를 시작할 수 없습니다. 기존 채팅 목록에서 대화를
+            확인해주세요.
+          </p>
+        ) : block.isPending ? (
+          <p role="status" className="text-body-14 text-black-900">
+            대화 가능 여부를 확인하고 있습니다.
+          </p>
+        ) : null)}
       {isOwnProduct && (
         <p className="text-body-14 text-black-900">
           내 상품에는 채팅을 시작할 수 없습니다.
