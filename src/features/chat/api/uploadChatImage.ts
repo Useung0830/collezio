@@ -11,10 +11,11 @@ export async function uploadChatImage(
   userId: string,
   messageId: string,
   file: File,
+  index?: number,
 ) {
   validateChatImage(file);
   validateFirebaseUser(userId);
-  const path = `chat/${roomId}/${userId}/${messageId}`;
+  const path = `chat/${roomId}/${userId}/${messageId}${index === undefined ? "" : `/${index}`}`;
   const imageRef = ref(firebaseStorage, path);
   const hash = Array.from(
     new Uint8Array(

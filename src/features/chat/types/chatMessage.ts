@@ -4,6 +4,7 @@ export interface ChatMessage {
   senderId: string;
   createdAt: string;
   imagePath?: string;
+  imagePaths?: string[];
   previousMessageId?: string;
 }
 
@@ -13,4 +14,5 @@ export interface SendChatMessageInput {
   userId: string;
   content: string;
   image?: File;
+  images?: File[];
 }

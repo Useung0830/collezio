@@ -809,6 +809,111 @@ test("업로드 후 메시지 확정 실패 시 이미지와 입력을 보존하
   await expect(page.getByAltText("채팅 이미지")).toBeVisible();
 });
 
+test("사진 묶음 10장과 상세 보기의 이동·저장·공유", async ({
+  page,
+  request,
+  productIds,
+}) => {
+  const buyer = await createAccount(request, "묶음 구매자");
+  const seller = await createAccount(request, "묶음 판매자");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
+  await login(page, buyer);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await expect(page.getByLabel("메시지", { exact: true })).toBeEnabled();
+  const files = Array.from({ length: 10 }, (_, index) => ({
+    ...chatImage,
+    name: `photo-${index}.png`,
+  }));
+  await page.getByLabel("채팅 이미지 선택").setInputFiles([...files, files[0]]);
+  await expect(
+    page.getByText("사진은 최대 10장까지 선택할 수 있습니다."),
+  ).toBeVisible();
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toHaveCount(0);
+  await page.getByLabel("채팅 이미지 선택").setInputFiles(files);
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toHaveCount(10);
+  await page.getByRole("button", { name: "첨부 이미지 삭제" }).nth(4).click();
+  await expect(page.getByAltText("첨부 이미지 미리보기")).toHaveCount(9);
+  await page.getByLabel("채팅 이미지 선택").setInputFiles(files[4]);
+  await page.getByLabel("메시지", { exact: true }).fill("묶음 설명");
+  await page.getByRole("button", { name: "메시지 전송" }).click();
+  const items = page.getByLabel("대화 메시지").getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  const album = page.getByRole("button", {
+    name: "사진 10장 상세 보기",
+    exact: true,
+  });
+  await expect(album.getByRole("img")).toHaveCount(10);
+  await expect(items.nth(1)).toContainText("묶음 설명");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/chat-album-10.png" });
+  await album.getByRole("img").last().click();
+  const viewer = page.getByRole("dialog", { name: "사진 상세 보기" });
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  await expect(
+    viewer.getByRole("button", { name: "이전 사진", exact: true }),
+  ).toBeDisabled();
+  await viewer.getByRole("button", { name: "다음 사진", exact: true }).click();
+  await expect(viewer.getByText("2 / 10", { exact: true })).toBeVisible();
+  await viewer.press("ArrowLeft");
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await viewer.getByRole("link", { name: "현재 사진 저장" }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe("chat-photo-1.png");
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => false,
+    });
+  });
+  await viewer.getByRole("button", { name: "공유", exact: true }).click();
+  await expect(viewer.getByRole("status")).toContainText(
+    "사진을 저장한 뒤 공유",
+  );
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data: ShareData) => {
+        document.documentElement.dataset.sharedPhoto = data.files?.[0]?.name;
+      },
+    });
+  });
+  await viewer.getByRole("button", { name: "공유", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-shared-photo",
+    "chat-photo-1.png",
+  );
+  await viewer.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  await album.click();
+  await expect(viewer.getByText("1 / 10", { exact: true })).toBeVisible();
+  await viewer.getByRole("button", { name: "사진 상세 닫기" }).click();
+  await page.reload();
+  await expect(album.getByRole("img")).toHaveCount(10);
+  for (const count of [2, 3]) {
+    await page
+      .getByLabel("채팅 이미지 선택")
+      .setInputFiles(files.slice(0, count));
+    await page.getByRole("button", { name: "메시지 전송" }).click();
+    const grid = page.getByRole("button", {
+      name: `사진 ${count}장 상세 보기`,
+      exact: true,
+    });
+    await expect(grid.getByRole("img")).toHaveCount(count);
+    await page.screenshot({ path: `test-results/chat-album-${count}.png` });
+  }
+  await expect(items).toHaveCount(4);
+});
+
 test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({
   page,
   request,

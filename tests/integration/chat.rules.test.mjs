@@ -727,6 +727,83 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       },
     );
 
+    await t.test(
+      "사진 10장은 한 메시지로 저장하고 묶음 권한과 개수 제한을 검증한다",
+      async () => {
+        const roomId = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const images = Array.from(
+          { length: 10 },
+          (_, index) =>
+            new File([new Uint8Array([137, 80, 78, index])], `${index}.png`, {
+              type: "image/png",
+            }),
+        );
+        const input = {
+          roomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "묶음 설명",
+          images,
+        };
+        await sendChatMessage(input);
+        await sendChatMessage(input);
+        const messages = await getChatMessages(roomId, user.uid);
+        assert.equal(messages.length, 2);
+        assert.equal(messages[0].imagePaths.length, 10);
+        assert.equal(messages[1].previousMessageId, messages[0].id);
+        for (const path of messages[0].imagePaths) {
+          for (const [auth, expected] of [
+            [sellerAuth, 200],
+            [strangerAuth, 403],
+          ]) {
+            const response = await fetch(
+              `http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(path)}?alt=media`,
+              {
+                headers: {
+                  Authorization: `Firebase ${await auth.currentUser.getIdToken()}`,
+                },
+              },
+            );
+            assert.equal(response.status, expected);
+          }
+        }
+        await assert.rejects(
+          sendChatMessage({
+            ...input,
+            messageId: randomUUID(),
+            images: [...images, images[0]],
+          }),
+          /10/,
+        );
+        await sendChatMessage({
+          ...input,
+          messageId: randomUUID(),
+          content: "",
+          images: images.slice(0, 3),
+        });
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 3);
+        const batch = writeBatch(firebaseDb);
+        const invalidId = `${randomUUID()}-0`;
+        const invalid = {
+          senderId: user.uid,
+          content: "사진",
+          createdAt: serverTimestamp(),
+          imagePaths: messages[0].imagePaths,
+        };
+        batch.set(
+          doc(firebaseDb, "chatRooms", roomId, "messages", invalidId),
+          invalid,
+        );
+        batch.update(doc(firebaseDb, "chatRooms", roomId), {
+          lastMessage: { id: invalidId, ...invalid },
+        });
+        await assert.rejects(batch.commit(), denied);
+      },
+    );
+
     await t.test("로그아웃 후 이전 사용자 데이터 요청을 차단한다", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(

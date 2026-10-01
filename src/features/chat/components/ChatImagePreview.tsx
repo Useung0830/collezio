@@ -12,7 +12,7 @@ export default function ChatImagePreview({
   onRemove,
 }: ChatImagePreviewProps) {
   return (
-    <div className="relative ml-11 w-fit pt-2 pr-2">
+    <div className="relative w-fit shrink-0 pt-2 pr-2">
       <Image
         src={url}
         alt="첨부 이미지 미리보기"

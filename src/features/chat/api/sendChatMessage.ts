@@ -13,6 +13,10 @@ import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
 import { parseChatMessage } from "@/features/chat/utils/parseChatMessage";
 import { parseChatRoom } from "@/features/chat/utils/parseChatRoom";
 import { validateChatDocumentId } from "@/features/chat/utils/validateChatDocumentId";
+import {
+  MAX_CHAT_IMAGES,
+  validateChatImage,
+} from "@/features/chat/utils/validateChatImage";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
@@ -25,28 +29,49 @@ export async function sendChatMessage({
   userId,
   content,
   image,
+  images,
 }: SendChatMessageInput) {
   for (const id of [roomId, messageId, userId]) validateChatDocumentId(id);
+  const files = images ?? (image ? [image] : []);
+  if ((image && images) || files.length > MAX_CHAT_IMAGES)
+    throw new Error("사진은 최대 10장까지 선택할 수 있습니다.");
+  files.forEach(validateChatImage);
+  const hasImages = files.length > 0;
   const text = content.trim();
   if (
-    (!text && !image) ||
+    (!text && !hasImages) ||
     text.length > MAX_CHAT_MESSAGE_LENGTH ||
-    messageId.length > (image ? 126 : 128)
+    messageId.length > (hasImages ? 126 : 128)
   )
     throw new Error("메시지는 1~2,000자로 입력해주세요.");
   await firebaseAuth.authStateReady();
   validateFirebaseUser(userId);
   const roomRef = doc(firebaseDb, "chatRooms", roomId);
   const imageId = `${messageId}-0`;
-  const finalId = image ? (text ? `${messageId}-1` : imageId) : messageId;
-  const imagePath = image
-    ? await uploadChatImage(roomId, userId, imageId, image)
-    : null;
+  const finalId = hasImages ? (text ? `${messageId}-1` : imageId) : messageId;
+  const paths: string[] = [];
+  for (const [index, file] of files.entries()) {
+    paths.push(
+      await uploadChatImage(
+        roomId,
+        userId,
+        imageId,
+        file,
+        files.length > 1 ? index : undefined,
+      ),
+    );
+  }
+  const imagePayload =
+    paths.length > 1
+      ? { imagePaths: paths }
+      : paths.length
+        ? { imagePath: paths[0] }
+        : {};
   const messageRef = doc(roomRef, "messages", finalId);
   const payload = {
     content: text || "사진",
-    ...(imagePath && !text ? { imagePath } : {}),
-    ...(imagePath && text ? { previousMessageId: imageId } : {}),
+    ...(hasImages && !text ? imagePayload : {}),
+    ...(hasImages && text ? { previousMessageId: imageId } : {}),
   };
   let observed:
     | {
@@ -77,6 +102,8 @@ export async function sendChatMessage({
               existing.senderId !== userId ||
               existing.content !== payload.content ||
               existing.imagePath !== payload.imagePath ||
+              JSON.stringify(existing.imagePaths) !==
+                JSON.stringify(payload.imagePaths) ||
               existing.previousMessageId !== payload.previousMessageId
             )
               throw new Error("메시지 전송 정보가 일치하지 않습니다.");
@@ -118,10 +145,10 @@ export async function sendChatMessage({
             senderId: userId,
             createdAt: serverTimestamp(),
           };
-          if (imagePath && text)
+          if (hasImages && text)
             transaction.set(doc(roomRef, "messages", imageId), {
               content: "사진",
-              imagePath,
+              ...imagePayload,
               senderId: userId,
               createdAt: serverTimestamp(),
             });

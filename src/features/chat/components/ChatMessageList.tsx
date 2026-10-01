@@ -48,8 +48,14 @@ export default function ChatMessageList({
                 aria-label={isMine ? "내 메시지" : "상대방 메시지"}
                 className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
               >
-                {message.imagePath ? (
-                  <ChatMessageImage path={message.imagePath} userId={userId} />
+                {message.imagePaths || message.imagePath ? (
+                  <ChatMessageImage
+                    paths={
+                      message.imagePaths ??
+                      (message.imagePath ? [message.imagePath] : [])
+                    }
+                    userId={userId}
+                  />
                 ) : (
                   <p
                     className={`text-body-14 max-w-[75%] min-w-0 rounded-xl px-3 py-2.5 wrap-anywhere whitespace-pre-wrap ${isMine ? "bg-black-600 rounded-tr-none text-white" : "text-black-900 rounded-tl-none bg-white"}`}

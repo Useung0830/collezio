@@ -32,6 +32,30 @@ export function parseChatMessage(id: string, value: unknown): ChatMessage {
       data.previousMessageId !== undefined)
   )
     throw new Error("이미지 메시지를 확인할 수 없습니다.");
+  if (data.imagePaths !== undefined) {
+    if (
+      !Array.isArray(data.imagePaths) ||
+      data.imagePaths.length < 1 ||
+      data.imagePaths.length > 10 ||
+      data.imagePath !== undefined ||
+      data.previousMessageId !== undefined ||
+      data.content !== "사진" ||
+      !id.endsWith("-0")
+    )
+      throw new Error("이미지 묶음을 확인할 수 없습니다.");
+    const roomId =
+      typeof data.imagePaths[0] === "string"
+        ? data.imagePaths[0].split("/")[1]
+        : "";
+    validateChatDocumentId(roomId);
+    if (
+      !data.imagePaths.every(
+        (path, index) =>
+          path === `chat/${roomId}/${data.senderId}/${id}/${index}`,
+      )
+    )
+      throw new Error("이미지 묶음을 확인할 수 없습니다.");
+  }
   if (
     data.previousMessageId !== undefined &&
     (typeof data.previousMessageId !== "string" ||
@@ -46,6 +70,9 @@ export function parseChatMessage(id: string, value: unknown): ChatMessage {
     createdAt: data.createdAt.toDate().toISOString(),
     ...(typeof data.imagePath === "string"
       ? { imagePath: data.imagePath }
+      : {}),
+    ...(Array.isArray(data.imagePaths)
+      ? { imagePaths: data.imagePaths as string[] }
       : {}),
     ...(typeof data.previousMessageId === "string"
       ? { previousMessageId: data.previousMessageId }

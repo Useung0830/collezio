@@ -8,6 +8,7 @@ import { useSendChatMessageMutation } from "@/features/chat/hooks/useSendChatMes
 import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
 import {
   CHAT_IMAGE_TYPES,
+  MAX_CHAT_IMAGES,
   validateChatImage,
 } from "@/features/chat/utils/validateChatImage";
 
@@ -24,32 +25,39 @@ export default function ChatMessageComposer({
 }: ChatMessageComposerProps) {
   const mutation = useSendChatMessageMutation();
   const [content, setContent] = useState("");
-  const [attachment, setAttachment] = useState<{
-    file: File;
-    url: string;
-  } | null>(null);
+  const [attachments, setAttachments] = useState<
+    {
+      file: File;
+      url: string;
+    }[]
+  >([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const previewUrl = useRef<string | null>(null);
+  const previewUrls = useRef<string[]>([]);
   const previousRequest = useRef<SendChatMessageInput | null>(null);
   const isSubmitting = useRef(false);
 
   const clearAttachment = () => {
-    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
-    previewUrl.current = null;
-    setAttachment(null);
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.current = [];
+    setAttachments([]);
     setImageError(null);
   };
   const handleSelectImage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (!file || disabled || mutation.isPending) return;
+    if (!files.length || disabled || mutation.isPending) return;
     try {
-      validateChatImage(file);
-      clearAttachment();
-      const url = URL.createObjectURL(file);
-      previewUrl.current = url;
-      setAttachment({ file, url });
+      if (attachments.length + files.length > MAX_CHAT_IMAGES)
+        throw new Error("사진은 최대 10장까지 선택할 수 있습니다.");
+      files.forEach(validateChatImage);
+      const selected = files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+      }));
+      previewUrls.current.push(...selected.map(({ url }) => url));
+      setAttachments([...attachments, ...selected]);
+      setImageError(null);
     } catch (error) {
       setImageError(
         error instanceof Error ? error.message : "이미지를 확인해주세요.",
@@ -58,7 +66,7 @@ export default function ChatMessageComposer({
   };
   useEffect(
     () => () => {
-      if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+      previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
     },
     [],
   );
@@ -67,7 +75,7 @@ export default function ChatMessageComposer({
     event.preventDefault();
     const text = content.trim();
     if (
-      (!text && !attachment) ||
+      (!text && !attachments.length) ||
       text.length > MAX_CHAT_MESSAGE_LENGTH ||
       disabled ||
       mutation.isPending ||
@@ -76,14 +84,16 @@ export default function ChatMessageComposer({
       return;
     const previous = previousRequest.current;
     const request =
-      previous?.content === text && previous.image === attachment?.file
+      previous?.content === text &&
+      previous.images?.length === attachments.length &&
+      previous.images.every((file, index) => file === attachments[index].file)
         ? previous
         : {
             roomId,
             userId,
             content: text,
             messageId: crypto.randomUUID(),
-            ...(attachment ? { image: attachment.file } : {}),
+            images: attachments.map(({ file }) => file),
           };
     previousRequest.current = request;
     isSubmitting.current = true;
@@ -119,6 +129,7 @@ export default function ChatMessageComposer({
       <input
         ref={fileInput}
         type="file"
+        multiple
         accept={CHAT_IMAGE_TYPES.join(",")}
         aria-label="채팅 이미지 선택"
         className="sr-only"
@@ -126,12 +137,31 @@ export default function ChatMessageComposer({
         disabled={disabled || mutation.isPending}
         onChange={handleSelectImage}
       />
-      {attachment && (
-        <ChatImagePreview
-          url={attachment.url}
-          disabled={disabled || mutation.isPending}
-          onRemove={clearAttachment}
-        />
+      {attachments.length > 0 && (
+        <div
+          className="ml-11 flex gap-2 overflow-x-auto"
+          aria-label="첨부 이미지 목록"
+        >
+          {attachments.map((attachment, index) => (
+            <ChatImagePreview
+              key={attachment.url}
+              url={attachment.url}
+              disabled={disabled || mutation.isPending}
+              onRemove={() => {
+                URL.revokeObjectURL(attachment.url);
+                previewUrls.current = previewUrls.current.filter(
+                  (url) => url !== attachment.url,
+                );
+                setAttachments(
+                  attachments.filter(
+                    (_, selectedIndex) => selectedIndex !== index,
+                  ),
+                );
+                setImageError(null);
+              }}
+            />
+          ))}
+        </div>
       )}
       {imageError && (
         <p role="alert" className="text-body-14 text-black-900">
@@ -174,7 +204,9 @@ export default function ChatMessageComposer({
           <button
             type="submit"
             disabled={
-              (!content.trim() && !attachment) || disabled || mutation.isPending
+              (!content.trim() && !attachments.length) ||
+              disabled ||
+              mutation.isPending
             }
             aria-busy={mutation.isPending}
             title={mutation.isError ? "다시 보내기" : "메시지 전송"}

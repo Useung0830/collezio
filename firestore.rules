@@ -183,44 +183,63 @@ service cloud.firestore {
       }
       function isValidMessage(data, messageId) {
         return data.keys().hasAll(['content', 'senderId', 'createdAt'])
-          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'previousMessageId'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId'])
           && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
           && data.content.matches('(?s).*\\S.*')
           && data.senderId == request.auth.uid && data.createdAt == request.time
           && (!('imagePath' in data) || (data.content == '사진'
-            && !('previousMessageId' in data)
+            && !('previousMessageId' in data) && !('imagePaths' in data)
             && messageId.matches('^[a-zA-Z0-9-]+-0$')
             && data.imagePath == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId
+            && get(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId)).data.senderId == request.auth.uid))
+          && (!('imagePaths' in data) || (isImagePayload(data, messageId)
             && get(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId)).data.senderId == request.auth.uid))
           && (!('previousMessageId' in data) || hasPreviousImage(data, messageId));
       }
       function hasPreviousImage(data, messageId) {
+        // Each new message validates its payload in its own create rule.
+        // Only validate the atomic link here to stay within expression limits.
         let imageId = data.previousMessageId;
         let imagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(imageId);
         let image = getAfter(imagePath).data;
         return imageId is string && imageId.matches('^[a-zA-Z0-9-]+-0$')
           && messageId == imageId.replace('-0$', '-1')
-          && !exists(imagePath) && isImagePayload(image, imageId)
+          && !exists(imagePath) && ('imagePath' in image || 'imagePaths' in image)
           && image.createdAt == data.createdAt && image.senderId == data.senderId;
       }
+      function validImageAt(paths, messageId, index) {
+        return paths.size() <= index || paths[index] == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId + '/' + string(index);
+      }
+      function validImagePaths(paths, messageId) {
+        return paths is list && paths.size() >= 1 && paths.size() <= 10
+          && validImageAt(paths, messageId, 0) && validImageAt(paths, messageId, 1)
+          && validImageAt(paths, messageId, 2) && validImageAt(paths, messageId, 3)
+          && validImageAt(paths, messageId, 4) && validImageAt(paths, messageId, 5)
+          && validImageAt(paths, messageId, 6) && validImageAt(paths, messageId, 7)
+          && validImageAt(paths, messageId, 8) && validImageAt(paths, messageId, 9);
+      }
       function isImagePayload(data, messageId) {
-        return data.keys().hasAll(['content', 'senderId', 'createdAt', 'imagePath'])
-          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath'])
+        return data.keys().hasAll(['content', 'senderId', 'createdAt'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths'])
           && data.content == '사진' && data.senderId == request.auth.uid
           && data.createdAt == request.time
-          && data.imagePath == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId;
+          && messageId.matches('^[a-zA-Z0-9-]+-0$')
+          && ((('imagePath' in data) && !('imagePaths' in data) && data.imagePath == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId)
+            || (!('imagePath' in data) && ('imagePaths' in data) && validImagePaths(data.imagePaths, messageId)));
       }
       function hasNewMessage() {
+        // The referenced document must be new, so its create rule validates it.
         let summary = request.resource.data.lastMessage;
         let messagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(summary.id);
         let message = getAfter(messagePath).data;
         return summary.keys().hasAll(['id', 'content', 'senderId', 'createdAt'])
-          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt', 'imagePath', 'previousMessageId'])
+          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId'])
           && summary.id is string && summary.id.size() > 0 && summary.id.size() <= 128
-          && !exists(messagePath) && isValidMessage(message, summary.id)
+          && !exists(messagePath)
           && summary.content == message.content && summary.senderId == message.senderId
           && summary.createdAt == message.createdAt
           && summary.get('imagePath', null) == message.get('imagePath', null)
+          && summary.get('imagePaths', null) == message.get('imagePaths', null)
           && summary.get('previousMessageId', null) == message.get('previousMessageId', null);
       }
       function hasChatCountIncrement() {
@@ -276,9 +295,10 @@ service cloud.firestore {
             && ((room.lastMessage.id == messageId
               && room.lastMessage.content == data.content
               && room.lastMessage.get('imagePath', null) == data.get('imagePath', null)
+              && room.lastMessage.get('imagePaths', null) == data.get('imagePaths', null)
               && room.lastMessage.get('previousMessageId', null) == data.get('previousMessageId', null))
               || (room.lastMessage.get('previousMessageId', null) == messageId
-                && isImagePayload(data, messageId)
+                && ('imagePath' in data || 'imagePaths' in data)
                 && hasPreviousImage(room.lastMessage, room.lastMessage.id)));
         }
         allow read: if canAccessRoom();
