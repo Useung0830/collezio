@@ -104,11 +104,17 @@ test("취소는 로그인을 유지하고 확인은 다른 탭·새로고침·�
     ).toBeVisible();
     await page.goto("/favorites");
     await page.getByRole("link", { name: "보유품 목록", exact: true }).click();
+    await expect(page).toHaveURL(/\/collections$/);
+    await expect(
+      page.getByText("로그인하면 내가 등록한 상품을 확인할 수 있습니다."),
+    ).toBeVisible();
     await page.goBack();
+    await expect(page).toHaveURL(/\/favorites$/);
     await expect(
       page.getByText("로그인하면 찜한 상품을 확인할 수 있습니다."),
     ).toBeVisible();
     await page.goForward();
+    await expect(page).toHaveURL(/\/collections$/);
     await expect(
       page.getByText("로그인하면 내가 등록한 상품을 확인할 수 있습니다."),
     ).toBeVisible();
