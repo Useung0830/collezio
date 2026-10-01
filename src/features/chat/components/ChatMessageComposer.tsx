@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 
-import Button from "@/components/common/button/Button";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/features/chat/constants/chat";
 import { useSendChatMessageMutation } from "@/features/chat/hooks/useSendChatMessageMutation";
 import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
@@ -59,31 +58,64 @@ export default function ChatMessageComposer({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex items-end gap-2">
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">메시지</span>
-          <textarea
-            aria-label="메시지"
-            value={content}
-            onChange={(event) => setContent(event.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={mutation.isPending || disabled}
-            maxLength={MAX_CHAT_MESSAGE_LENGTH}
-            rows={2}
-            placeholder="메시지를 입력해 주세요"
-            className="border-black-200 text-body-14 text-black-900 placeholder:text-black-400 w-full resize-none rounded-2xl border bg-white px-4 py-3 disabled:opacity-50"
-          />
-        </label>
-        <Button
-          type="submit"
-          disabled={!content.trim() || disabled}
-          isLoading={mutation.isPending}
-          size="sm"
-          aria-label="메시지 전송"
+    <form
+      onSubmit={handleSubmit}
+      className="flex shrink-0 flex-col gap-2 pb-[env(safe-area-inset-bottom)]"
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled
+          aria-label="사진 첨부 (준비 중)"
+          title="사진 전송 기능 준비 중"
+          className="text-black-400 flex size-9 shrink-0 items-center justify-center disabled:cursor-not-allowed"
         >
-          {mutation.isError ? "다시 보내기" : "전송"}
-        </Button>
+          <svg
+            viewBox="0 0 24 24"
+            className="size-5"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M8 4 6.5 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5L16 4H8Zm4 5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z" />
+          </svg>
+        </button>
+        <div className="border-black-200 focus-within:ring-black-400 flex min-w-0 flex-1 items-center gap-2 rounded-3xl border bg-white px-3 py-1.5 focus-within:ring-1">
+          <label className="flex min-w-0 flex-1">
+            <span className="sr-only">메시지</span>
+            <textarea
+              aria-label="메시지"
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={mutation.isPending || disabled}
+              maxLength={MAX_CHAT_MESSAGE_LENGTH}
+              rows={1}
+              placeholder="메시지를 입력해 주세요"
+              className="text-body-14 text-black-900 placeholder:text-black-400 [field-sizing:content] max-h-28 min-h-5 w-full resize-none bg-transparent py-1 outline-none disabled:opacity-50"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!content.trim() || disabled || mutation.isPending}
+            aria-busy={mutation.isPending}
+            title={mutation.isError ? "다시 보내기" : "메시지 전송"}
+            className="bg-black-600 hover:bg-black-900 focus-visible:outline-black-900 disabled:bg-black-300 flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
+            aria-label="메시지 전송"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="size-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 11 6-6 6 6M12 5v14" />
+            </svg>
+          </button>
+        </div>
       </div>
       {mutation.isPaused && (
         <p role="status" className="text-body-14 text-black-900">
