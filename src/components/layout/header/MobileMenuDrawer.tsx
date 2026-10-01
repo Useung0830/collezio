@@ -187,7 +187,6 @@ export default function MobileMenuDrawer({
       )}
       {isWithdrawalModalOpen && (
         <WithdrawalModal
-          isOpen={true}
           onClose={handleCloseWithdrawalModal}
           onConfirm={handleWithdrawal}
         />

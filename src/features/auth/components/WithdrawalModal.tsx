@@ -1,96 +1,124 @@
-"use client";
-import { useEffect, useState } from "react";
+﻿"use client";
+
+import type {
+  ChangeEvent,
+  FormEvent,
+  KeyboardEvent,
+  MouseEvent,
+  SyntheticEvent,
+} from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import Button from "@/components/common/button/Button";
-import IconButton from "@/components/common/button/IconButton";
 import WithdrawalFeedbackFields from "@/features/auth/components/WithdrawalFeedbackFields";
+import { useWithdrawalMutation } from "@/features/auth/hooks/useWithdrawalMutation";
 import type { WithdrawalFeedback } from "@/features/auth/types/withdrawal";
 
-import CloseIcon from "@/assets/icons/icon-close.svg";
-
-type WithdrawalModalProps = {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (feedback: WithdrawalFeedback) => void;
-};
+type WithdrawalModalProps = { onClose: () => void; onConfirm: () => void };
 
 export default function WithdrawalModal({
-  isOpen,
   onClose,
   onConfirm,
 }: WithdrawalModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const { withdraw, isPending, errorMessage } = useWithdrawalMutation();
   const [feedback, setFeedback] = useState<WithdrawalFeedback>({
     reasons: [],
     detail: "",
   });
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
-
-  const handleConfirm = () => {
-    onConfirm({ ...feedback, detail: feedback.detail.trim() });
+  const [password, setPassword] = useState("");
+  const handleClose = () => {
+    if (!isPending) onClose();
   };
-
-  if (!isOpen) {
-    return null;
-  }
-
+  const handlePasswordChange = (event: ChangeEvent<HTMLInputElement>) =>
+    setPassword(event.currentTarget.value);
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (await withdraw({ feedback, password })) onConfirm();
+  };
+  const handleCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault();
+    handleClose();
+  };
+  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target !== event.currentTarget) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+    )
+      handleClose();
+  };
+  const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") event.stopPropagation();
+  };
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center px-4 py-6">
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="회원 탈퇴 창 닫기"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="withdrawal-title"
-        className="relative max-h-full w-full max-w-160 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8"
-      >
-        <div className="flex items-center justify-between gap-4">
-          <h2 id="withdrawal-title" className="text-heading-20 text-black-900">
-            회원 탈퇴
-          </h2>
-          <IconButton
-            size="sm"
-            aria-label="회원 탈퇴 창 닫기"
-            onClick={onClose}
-          >
-            <CloseIcon className="size-5" aria-hidden="true" />
-          </IconButton>
-        </div>
-
-        <WithdrawalFeedbackFields value={feedback} onChange={setFeedback} />
-        <p className="text-body-14 text-black-900 mt-4">
-          ???? ??, ??????, ??????? ???? ??? ? ????. ??? ????? ?? ???? ???? ????.
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      aria-busy={isPending}
+      onCancel={handleCancel}
+      onClick={handleBackdropClick}
+      onKeyDown={handleKeyDown}
+      className="text-black-900 m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-160 overflow-y-auto rounded-2xl bg-white p-6 shadow-xl backdrop:bg-black/40 sm:p-8"
+    >
+      <h2 id={titleId} className="text-heading-20">
+        회원 탈퇴
+      </h2>
+      <form onSubmit={handleSubmit}>
+        <WithdrawalFeedbackFields
+          value={feedback}
+          onChange={setFeedback}
+          disabled={isPending}
+        />
+        <p className="text-body-14 mt-4">
+          탈퇴하면 계정, 상품·이미지, 게시글·댓글이 삭제되며 복구할 수 없습니다.
+          채팅은 상대방에게 탈퇴 회원으로 표시되어 남습니다.
         </p>
-
-        <Button
-          size="sm"
-          shape="rounded"
-          className="mt-6 w-full"
-          onClick={handleConfirm}
-        >
-          회원 탈퇴
-        </Button>
-      </div>
-    </div>
+        <label className="text-label-14 mt-4 flex flex-col gap-2">
+          본인 확인을 위한 비밀번호
+          <input
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            disabled={isPending}
+            onChange={handlePasswordChange}
+            className="border-black-300 text-body-16 rounded-xl border p-3"
+          />
+        </label>
+        {errorMessage && (
+          <p role="alert" className="text-body-14 mt-3 text-red-500">
+            {errorMessage}
+          </p>
+        )}
+        {isPending && (
+          <p role="status" className="text-body-14 mt-3">
+            탈퇴를 처리하고 있습니다. 잠시 기다려주세요.
+          </p>
+        )}
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          <Button type="button" disabled={isPending} onClick={handleClose}>
+            취소
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isPending}
+            isLoading={isPending}
+          >
+            회원 탈퇴
+          </Button>
+        </div>
+      </form>
+    </dialog>
   );
 }

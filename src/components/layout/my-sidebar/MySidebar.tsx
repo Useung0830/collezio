@@ -104,7 +104,6 @@ export default function MySidebar() {
       )}
       {isWithdrawalModalOpen && (
         <WithdrawalModal
-          isOpen={true}
           onClose={handleCloseWithdrawalModal}
           onConfirm={handleWithdrawal}
         />
