@@ -683,9 +683,7 @@ test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({
   ).toBeVisible();
   await expect(page).toHaveURL(`http://127.0.0.1:3100/products/${productId}`);
   await page.goto("/chat");
-  await expect(
-    page.getByText("로그인 후 채팅 목록을 확인할 수 있습니다."),
-  ).toBeVisible();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/login");
   await login(page, seller);
   await page.goto(`/products/${productId}`);
   await expect(button).toBeDisabled();

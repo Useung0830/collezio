@@ -10,12 +10,14 @@ interface ChatConversationProps {
   roomId: string;
   userId: string;
   partnerId: string;
+  isPartnerWithdrawn: boolean;
 }
 
 export default function ChatConversation({
   roomId,
   userId,
   partnerId,
+  isPartnerWithdrawn,
 }: ChatConversationProps) {
   const query = useChatMessagesQuery(roomId, userId);
   return (
@@ -47,13 +49,19 @@ export default function ChatConversation({
           <p>첫 메시지를 보내면 상대방의 채팅 목록에도 표시됩니다.</p>
         </div>
       )}
-      <ChatBlockNotice roomId={roomId} userId={userId} partnerId={partnerId}>
-        <ChatMessageComposer
-          roomId={roomId}
-          userId={userId}
-          disabled={query.isPending || query.isError}
-        />
-      </ChatBlockNotice>
+      {isPartnerWithdrawn ? (
+        <p className="text-body-14 text-black-900">
+          탈퇴한 회원에게는 메시지를 보낼 수 없습니다.
+        </p>
+      ) : (
+        <ChatBlockNotice roomId={roomId} userId={userId} partnerId={partnerId}>
+          <ChatMessageComposer
+            roomId={roomId}
+            userId={userId}
+            disabled={query.isPending || query.isError}
+          />
+        </ChatBlockNotice>
+      )}
     </section>
   );
 }

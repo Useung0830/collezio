@@ -102,11 +102,12 @@ export default function MySidebar() {
           onConfirm={handleLogout}
         />
       )}
-      <WithdrawalModal
-        isOpen={isWithdrawalModalOpen}
-        onClose={handleCloseWithdrawalModal}
-        onConfirm={handleWithdrawal}
-      />
+      {isWithdrawalModalOpen && (
+        <WithdrawalModal
+          onClose={handleCloseWithdrawalModal}
+          onConfirm={handleWithdrawal}
+        />
+      )}
     </>
   );
 }

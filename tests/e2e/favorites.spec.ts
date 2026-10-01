@@ -285,19 +285,10 @@ test("오프라인 요청은 중복 클릭을 막고 연결 복구 후 저장한
   await expect(button).toBeEnabled();
 });
 
-test("비로그인 찜 목록은 목업 대신 로그인 안내를 표시한다", async ({
-  page,
-}) => {
+test("비로그인 찜 목록은 로그인 페이지로 이동한다", async ({ page }) => {
   await page.goto("/favorites");
-  const favorites = page.getByRole("region", { name: /찜한 컬렉션/ });
-  await expect(
-    favorites.getByText("로그인하면 찜한 상품을 확인할 수 있습니다."),
-  ).toBeVisible();
-  await expect(favorites.getByRole("heading", { level: 3 })).toHaveCount(0);
-  await expect(favorites.getByRole("link", { name: "로그인" })).toHaveAttribute(
-    "href",
-    "/login",
-  );
+  await expect(page).toHaveURL("http://127.0.0.1:3100/login");
+  await expect(page.getByLabel("이메일", { exact: true })).toBeVisible();
 });
 
 test("상세에서 찜한 상품을 목록에서 열고 취소 후 뒤로 가면 목록에서 사라진다", async ({

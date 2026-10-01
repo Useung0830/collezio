@@ -2,19 +2,27 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isActiveUser() {
+      return request.auth != null && !exists(/databases/$(database)/documents/withdrawalRequests/$(request.auth.uid));
+    }
+    match /withdrawalRequests/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+    }
     function canChat(firstId, secondId) {
-      return !existsAfter(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
+      return !exists(/databases/$(database)/documents/withdrawalRequests/$(firstId))
+        && !exists(/databases/$(database)/documents/withdrawalRequests/$(secondId))
+        && !existsAfter(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
         && !existsAfter(/databases/$(database)/documents/users/$(secondId)/chatBlocks/$(firstId));
     }
     match /users/{userId}/chatBlocks/{partnerId} {
       // 상대방은 자신과의 차단 여부만 조회할 수 있고 전체 목록은 읽을 수 없습니다.
-      allow get: if request.auth != null && request.auth.uid in [userId, partnerId];
-      allow list: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId && userId != partnerId
+      allow get: if isActiveUser() && request.auth.uid in [userId, partnerId];
+      allow list: if isActiveUser() && request.auth.uid == userId;
+      allow create: if isActiveUser() && request.auth.uid == userId && userId != partnerId
         && request.resource.data.keys().hasAll(['createdAt'])
         && request.resource.data.keys().hasOnly(['createdAt'])
         && request.resource.data.createdAt == request.time;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow delete: if isActiveUser() && request.auth.uid == userId;
     }
     match /users/{userId}/chatReports/{reportId} {
       function isValidReport() {
@@ -31,22 +39,22 @@ service cloud.firestore {
           && (data.reason != '기타' || data.details.matches('(?s).*\\S.*'))
           && data.createdAt == request.time;
       }
-      allow get: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId && isValidReport();
+      allow get: if isActiveUser() && request.auth.uid == userId;
+      allow create: if isActiveUser() && request.auth.uid == userId && isValidReport();
     }
     function isCommunityOwner(authorId) {
-      return request.auth != null && request.auth.uid == authorId;
+      return isActiveUser() && request.auth.uid == authorId;
     }
     function isCommunityText(value, maximum) {
       return value is string && value.size() > 0 && value.size() <= maximum
         && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
     }
     function canCleanCommunityPost(postId) {
-      return request.auth != null
+      return isActiveUser()
         && get(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == request.auth.uid;
     }
     match /communityPostDeletions/{postId} {
-      allow get: if request.auth != null && (!exists(/databases/$(database)/documents/communityPostDeletions/$(postId)) || isCommunityOwner(resource.data.authorId));
+      allow get: if isActiveUser() && (!exists(/databases/$(database)/documents/communityPostDeletions/$(postId)) || isCommunityOwner(resource.data.authorId));
       allow create: if isCommunityOwner(request.resource.data.authorId)
         && request.resource.data.keys().hasAll(['authorId', 'images', 'createdAt'])
         && request.resource.data.keys().hasOnly(['authorId', 'images', 'createdAt'])
@@ -99,7 +107,7 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time
         && request.resource.data.likeCount is int && request.resource.data.likeCount == 0
         && request.resource.data.viewCount is int && request.resource.data.viewCount == 0;
-      allow update: if request.auth != null && (
+      allow update: if isActiveUser() && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.authorId)) && (
         (isCommunityOwner(resource.data.authorId)
           && isValidPost(request.resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'images', 'updatedAt'])
@@ -131,7 +139,8 @@ service cloud.firestore {
           && data.postId is string && data.postId.size() > 0
           && !data.postId.matches('.*[/].*')
           && isCommunityText(data.content, 1000)
-          && existsAfter(/databases/$(database)/documents/communityPosts/$(data.postId));
+          && existsAfter(/databases/$(database)/documents/communityPosts/$(data.postId))
+          && !exists(/databases/$(database)/documents/withdrawalRequests/$(get(/databases/$(database)/documents/communityPosts/$(data.postId)).data.authorId));
       }
       allow read: if true;
       allow create: if isCommunityOwner(request.resource.data.authorId)
@@ -147,7 +156,7 @@ service cloud.firestore {
     }
     match /users/{userId}/productChats/{productId} {
       function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
+        return isActiveUser() && request.auth.uid == userId;
       }
       function isValidLink() {
         let data = request.resource.data;
@@ -216,13 +225,13 @@ service cloud.firestore {
           && !exists(linkPath) && getAfter(linkPath).data.roomId == roomId;
       }
       // 상대방은 첫 메시지 전송 전에는 목록뿐 아니라 직접 조회도 할 수 없습니다.
-      allow read: if request.auth != null && request.auth.uid in resource.data.visibleTo;
-      allow create: if request.auth != null && isValidDraft();
-      allow update: if request.auth != null && isValidMessageUpdate();
+      allow read: if isActiveUser() && request.auth.uid in resource.data.visibleTo;
+      allow create: if isActiveUser() && isValidDraft();
+      allow update: if isActiveUser() && isValidMessageUpdate();
 
       match /messages/{messageId} {
         function canAccessRoom() {
-          return request.auth != null
+          return isActiveUser()
             && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.visibleTo;
         }
         function matchesRoomSummary() {
@@ -241,7 +250,7 @@ service cloud.firestore {
 
     match /profiles/{userId} {
       allow get: if true;
-      allow create: if request.auth != null
+      allow create: if isActiveUser()
         && request.auth.uid == userId
         && request.resource.data.keys().hasAll(['nickname', 'imageUrl', 'bio', 'createdAt'])
         && request.resource.data.keys().hasOnly(['nickname', 'imageUrl', 'bio', 'createdAt'])
@@ -255,7 +264,7 @@ service cloud.firestore {
 
     match /users/{userId}/favorites/{productId} {
       function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
+        return isActiveUser() && request.auth.uid == userId;
       }
       function hasCountChange(delta) {
         let productPath = /databases/$(database)/documents/products/$(productId);
@@ -343,10 +352,11 @@ service cloud.firestore {
           && isValidImageAt(images, 8) && isValidImageAt(images, 9);
       }
       allow read: if true;
-      allow update: if request.auth != null
+      allow update: if isActiveUser()
+        && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.get('sellerId', '__legacy__')))
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange()));
-      allow create: if request.auth != null
+      allow create: if isActiveUser()
         && isValidProductFields(request.resource.data)
         && request.resource.data.sellerId == request.auth.uid
         && request.resource.data.status == 'available'

@@ -4,7 +4,8 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /community/{userId}/{postId}/{imageId} {
       function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
+        return request.auth != null && request.auth.uid == userId
+          && !firestore.exists(/databases/(default)/documents/withdrawalRequests/$(userId));
       }
       function canUpload() {
         return !firestore.exists(/databases/(default)/documents/communityPostDeletions/$(postId))
@@ -30,7 +31,8 @@ service firebase.storage {
     match /products/{userId}/{fileName} {
       function isOwner() {
         return request.auth != null
-          && request.auth.uid == userId;
+          && request.auth.uid == userId
+          && !firestore.exists(/databases/(default)/documents/withdrawalRequests/$(userId));
       }
 
       allow get: if true;
