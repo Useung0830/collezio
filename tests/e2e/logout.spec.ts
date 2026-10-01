@@ -12,13 +12,22 @@ async function login(page: Page, request: APIRequestContext) {
     { data: { email, password, returnSecureToken: true } },
   );
   expect(response.ok()).toBeTruthy();
-  const account = await response.json();
+  const account: unknown = await response.json();
+  if (
+    typeof account !== "object" ||
+    account === null ||
+    !("localId" in account) ||
+    typeof account.localId !== "string" ||
+    !account.localId
+  ) {
+    throw new Error("회원가입 응답에 유효한 사용자 ID가 없습니다.");
+  }
   await page.goto("/login");
   await page.getByLabel("이메일", { exact: true }).fill(email);
   await page.getByLabel("비밀번호", { exact: true }).fill(password);
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page).toHaveURL("http://127.0.0.1:3100/");
-  return account.localId as string;
+  return account.localId;
 }
 
 test("취소는 로그인을 유지하고 확인은 다른 탭·새로고침·뒤로가기에도 반영된다", async ({

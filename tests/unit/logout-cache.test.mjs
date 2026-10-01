@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { QueryClient } from "@tanstack/react-query";
 
-import { removeUserQueries } from "../../src/features/auth/utils/removeUserQueries.ts";
+import { removeUserQueries } from "../../src/lib/query/removeUserQueries.ts";
 
 test("로그아웃 계정의 캐시만 제거하고 공개 목록과 다른 계정은 유지한다", () => {
   const client = new QueryClient();

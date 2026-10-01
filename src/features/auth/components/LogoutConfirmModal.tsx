@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent, MouseEvent, SyntheticEvent } from "react";
 import { useEffect, useId, useRef } from "react";
 
 import Button from "@/components/common/button/Button";
@@ -28,6 +29,42 @@ export default function LogoutConfirmModal({
     onCancel();
   };
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") event.stopPropagation();
+    if (event.key !== "Tab") return;
+    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>(
+      "button:not(:disabled)",
+    );
+    const first = buttons[0];
+    const last = buttons[buttons.length - 1];
+    if (!first || !last) {
+      event.preventDefault();
+    } else if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const handleDialogCancel = (event: SyntheticEvent<HTMLDialogElement>) => {
+    event.preventDefault();
+    handleCancel();
+  };
+
+  const handleBackdropClick = (event: MouseEvent<HTMLDialogElement>) => {
+    if (event.target !== event.currentTarget || isPending) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (
+      event.clientX < rect.left ||
+      event.clientX > rect.right ||
+      event.clientY < rect.top ||
+      event.clientY > rect.bottom
+    )
+      handleCancel();
+  };
+
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal();
@@ -39,39 +76,9 @@ export default function LogoutConfirmModal({
       ref={dialogRef}
       aria-labelledby={titleId}
       aria-busy={isPending}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") event.stopPropagation();
-        if (event.key !== "Tab") return;
-        const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>(
-          "button:not(:disabled)",
-        );
-        const first = buttons[0];
-        const last = buttons[buttons.length - 1];
-        if (!first || !last) {
-          event.preventDefault();
-        } else if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }}
-      onCancel={(event) => {
-        event.preventDefault();
-        handleCancel();
-      }}
-      onClick={(event) => {
-        if (event.target !== event.currentTarget || isPending) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        if (
-          event.clientX < rect.left ||
-          event.clientX > rect.right ||
-          event.clientY < rect.top ||
-          event.clientY > rect.bottom
-        )
-          handleCancel();
-      }}
+      onKeyDown={handleKeyDown}
+      onCancel={handleDialogCancel}
+      onClick={handleBackdropClick}
       className="text-black-900 m-auto w-[calc(100%-2rem)] max-w-90 rounded-2xl bg-white p-6 shadow-xl backdrop:bg-black/40"
     >
       <h2 id={titleId} className="text-heading-20 text-black-900 text-center">
