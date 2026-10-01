@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
 import ChatMessageImage from "@/features/chat/components/ChatMessageImage";
 import type { ChatMessage } from "@/features/chat/types/chatMessage";
 
+import styles from "./ChatMessageList.module.css";
+
 interface ChatMessageListProps {
   messages: ChatMessage[];
   userId: string;
@@ -21,8 +23,8 @@ export default function ChatMessageList({
   }, [lastMessageId]);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <ul aria-label="대화 메시지" className="flex flex-col gap-3 pb-2">
+    <div className={`${styles.scrollArea} min-h-0 flex-1 overflow-y-auto`}>
+      <ul aria-label="대화 메시지" className="flex flex-col gap-3 px-3 pb-2">
         {messages.map((message, index) => {
           const isMine = message.senderId === userId;
           const sentAt = new Date(message.createdAt);
