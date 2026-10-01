@@ -60,5 +60,10 @@ export function parseChatRoom(id: string, value: unknown): RegisteredChatRoom {
     status: data.status,
     createdAt: data.createdAt.toDate().toISOString(),
     lastMessage,
+    withdrawnUserIds: Array.isArray(data.withdrawnUserIds)
+      ? data.withdrawnUserIds.filter(
+          (userId): userId is string => typeof userId === "string",
+        )
+      : [],
   };
 }

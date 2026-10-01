@@ -19,10 +19,15 @@ export async function getChatRoomView(
     getPublicProfile(partnerId),
   ]);
   validateFirebaseUser(userId);
+  const isPartnerWithdrawn =
+    room.withdrawnUserIds?.includes(partnerId) ?? false;
   return {
     ...room,
-    partnerName: profile?.nickname ?? "프로필 없는 사용자",
-    partnerImageUrl: profile?.imageUrl ?? null,
+    isPartnerWithdrawn,
+    partnerName: isPartnerWithdrawn
+      ? "탈퇴 회원"
+      : (profile?.nickname ?? "프로필 없는 사용자"),
+    partnerImageUrl: isPartnerWithdrawn ? null : (profile?.imageUrl ?? null),
     productTitle: product?.title ?? "삭제된 상품",
     productImageUrl: product?.imageUrls[0] ?? null,
     transaction: product?.transaction ?? null,

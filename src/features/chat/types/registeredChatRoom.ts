@@ -9,10 +9,12 @@ export interface RegisteredChatRoom {
   status: "draft" | "active";
   createdAt: string;
   lastMessage: ChatMessage | null;
+  withdrawnUserIds?: string[];
 }
 
 export interface ChatRoomView extends RegisteredChatRoom {
   partnerName: string;
+  isPartnerWithdrawn: boolean;
   partnerImageUrl: string | null;
   productTitle: string;
   productImageUrl: string | null;

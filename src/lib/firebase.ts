@@ -3,6 +3,7 @@ import "client-only";
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { connectFunctionsEmulator, getFunctions } from "firebase/functions";
 import { connectStorageEmulator, getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -20,6 +21,7 @@ export const firebaseApp = getApps().length
 
 export const firebaseAuth = getAuth(firebaseApp);
 export const firebaseDb = getFirestore(firebaseApp);
+export const firebaseFunctions = getFunctions(firebaseApp, "asia-northeast3");
 export const firebaseStorage = getStorage(firebaseApp);
 
 if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
@@ -44,5 +46,6 @@ if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
       "127.0.0.1",
       Number(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_EMULATOR_PORT || 9199),
     );
+    connectFunctionsEmulator(firebaseFunctions, "127.0.0.1", 5001);
   }
 }

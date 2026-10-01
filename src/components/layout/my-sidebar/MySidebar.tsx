@@ -96,16 +96,18 @@ export default function MySidebar() {
           </ul>
         </div>
       </aside>
-      <LogoutConfirmModal
-        isOpen={isLogoutModalOpen}
-        onCancel={handleCloseLogoutModal}
-        onConfirm={handleLogout}
-      />
-      <WithdrawalModal
-        isOpen={isWithdrawalModalOpen}
-        onClose={handleCloseWithdrawalModal}
-        onConfirm={handleWithdrawal}
-      />
+      {isLogoutModalOpen && (
+        <LogoutConfirmModal
+          onCancel={handleCloseLogoutModal}
+          onConfirm={handleLogout}
+        />
+      )}
+      {isWithdrawalModalOpen && (
+        <WithdrawalModal
+          onClose={handleCloseWithdrawalModal}
+          onConfirm={handleWithdrawal}
+        />
+      )}
     </>
   );
 }

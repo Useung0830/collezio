@@ -31,11 +31,7 @@ test("내 글·댓글: 로그인, 빈 목록, 페이지 조회, 삭제 원문 �
   context,
 }) => {
   await page.goto("/posts");
-  await expect(
-    page.getByText("후 내가 쓴 글과 댓글을 확인할 수 있습니다.", {
-      exact: false,
-    }),
-  ).toBeVisible();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/login");
   const userId = await login(page, request);
   await page.goto("/posts");
   await expect(page.getByText("아직 작성한 게시글이 없습니다.")).toBeVisible();
