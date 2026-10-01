@@ -3,33 +3,26 @@ import { useEffect, useState } from "react";
 
 import Button from "@/components/common/button/Button";
 import IconButton from "@/components/common/button/IconButton";
+import WithdrawalFeedbackFields from "@/features/auth/components/WithdrawalFeedbackFields";
+import type { WithdrawalFeedback } from "@/features/auth/types/withdrawal";
 
-import CheckIcon from "@/assets/icons/icon-check.svg";
 import CloseIcon from "@/assets/icons/icon-close.svg";
 
 type WithdrawalModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (feedback: WithdrawalFeedback) => void;
 };
-
-const withdrawalReasons = [
-  "낮은 서비스 이용 빈도",
-  "원하는 상품 탐색 및 교환의 어려움",
-  "상품 등록 및 거래 과정의 불편",
-  "거래 안전성 및 신뢰에 대한 우려",
-  "기타 사유",
-];
-
-const MAX_REASON_LENGTH = 200;
 
 export default function WithdrawalModal({
   isOpen,
   onClose,
   onConfirm,
 }: WithdrawalModalProps) {
-  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
-  const [reasonDetail, setReasonDetail] = useState("");
+  const [feedback, setFeedback] = useState<WithdrawalFeedback>({
+    reasons: [],
+    detail: "",
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -49,18 +42,8 @@ export default function WithdrawalModal({
     };
   }, [isOpen, onClose]);
 
-  const handleReasonToggle = (reason: string) => {
-    setSelectedReasons((reasons) =>
-      reasons.includes(reason)
-        ? reasons.filter((selectedReason) => selectedReason !== reason)
-        : [...reasons, reason],
-    );
-  };
-
-  const handleReasonDetailChange = (
-    event: React.ChangeEvent<HTMLTextAreaElement>,
-  ) => {
-    setReasonDetail(event.target.value);
+  const handleConfirm = () => {
+    onConfirm({ ...feedback, detail: feedback.detail.trim() });
   };
 
   if (!isOpen) {
@@ -94,54 +77,16 @@ export default function WithdrawalModal({
           </IconButton>
         </div>
 
-        <p className="text-heading-24 text-black-900 mt-5">
-          탈퇴 사유를 알려주시면 개선을 위해 노력하겠습니다.
+        <WithdrawalFeedbackFields value={feedback} onChange={setFeedback} />
+        <p className="text-body-14 text-black-900 mt-4">
+          ???? ??, ??????, ??????? ???? ??? ? ????. ??? ????? ?? ???? ???? ????.
         </p>
-        <p className="text-body-14 text-black-600 mt-4">
-          다중 선택이 가능해요.
-        </p>
-
-        <div className="mt-4 flex flex-col gap-3">
-          {withdrawalReasons.map((reason) => {
-            const isSelected = selectedReasons.includes(reason);
-
-            return (
-              <button
-                key={reason}
-                type="button"
-                className="text-body-16 text-black-900 flex items-center gap-2 text-left"
-                aria-pressed={isSelected}
-                onClick={() => handleReasonToggle(reason)}
-              >
-                <span
-                  className={`flex size-4 shrink-0 items-center justify-center rounded-full ${isSelected ? "bg-black-900 text-white" : "bg-black-300 text-white"}`}
-                >
-                  <CheckIcon className="size-3" aria-hidden="true" />
-                </span>
-                {reason}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="border-black-300 relative mt-5 rounded-2xl border">
-          <textarea
-            value={reasonDetail}
-            maxLength={MAX_REASON_LENGTH}
-            aria-label="탈퇴 사유 상세 입력"
-            className="text-body-14 text-black-900 min-h-28 w-full resize-none rounded-2xl bg-transparent p-4 pb-8 outline-none"
-            onChange={handleReasonDetailChange}
-          />
-          <span className="text-caption-12 text-black-400 absolute right-4 bottom-3">
-            {reasonDetail.length}/{MAX_REASON_LENGTH}
-          </span>
-        </div>
 
         <Button
           size="sm"
           shape="rounded"
           className="mt-6 w-full"
-          onClick={onConfirm}
+          onClick={handleConfirm}
         >
           회원 탈퇴
         </Button>
