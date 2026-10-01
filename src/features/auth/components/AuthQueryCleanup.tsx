@@ -4,9 +4,8 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { onAuthStateChanged } from "firebase/auth";
 
-import { removeUserQueries } from "@/features/auth/utils/removeUserQueries";
-
 import { firebaseAuth } from "@/lib/firebase";
+import { removeUserQueries } from "@/lib/query/removeUserQueries";
 
 export default function AuthQueryCleanup() {
   const queryClient = useQueryClient();
