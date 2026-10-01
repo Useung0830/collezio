@@ -116,11 +116,17 @@ async function createProduct(
 test("신고와 차단은 연결 실패 후 재시도할 수 있다", async ({
   page,
   request,
+  productIds,
   context,
 }) => {
   const requester = await createAccount(request, "재시도 신고자");
   const seller = await createAccount(request, "재시도 대상");
-  const productId = await createProduct(request, seller.userId, "exchange");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "exchange",
+  );
   await login(page, requester);
   await page.goto(`/products/${productId}`);
   await page.getByRole("button", { name: "채팅하기", exact: true }).click();
@@ -179,13 +185,20 @@ test("신고와 차단은 연결 실패 후 재시도할 수 있다", async ({
 test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 해제해야 전송된다", async ({
   page,
   request,
+  productIds,
   browser,
 }) => {
   const requester = await createAccount(request, "차단 신청자");
   const seller = await createAccount(request, "차단 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   const secondProductId = await createProduct(
     request,
+    productIds,
     seller.userId,
     "exchange",
   );
@@ -287,10 +300,16 @@ test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 
 test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 유지된다", async ({
   page,
   request,
+  productIds,
 }) => {
   const requester = await createAccount(request, "신고 신청자");
   const seller = await createAccount(request, "신고 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   await login(page, requester);
   await page.goto(`/products/${productId}`);
   await page.getByRole("button", { name: "채팅하기", exact: true }).click();
