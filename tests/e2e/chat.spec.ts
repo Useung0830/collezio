@@ -914,6 +914,176 @@ test("사진 묶음 10장과 상세 보기의 이동·저장·공유", async ({
   await expect(items).toHaveCount(4);
 });
 
+test("구매 제안 작성·수락·변경 거절은 양쪽 채팅과 예약에 반영된다", async ({
+  page,
+  browser,
+  request,
+  productIds,
+}) => {
+  const buyer = await createAccount(request, "제안 구매자");
+  const seller = await createAccount(request, "제안 판매자");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
+  await login(page, buyer);
+  await page.goto(`/products/${productId}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await page.getByRole("button", { name: "구매 제안", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "구매 제안", exact: true });
+  await form.getByLabel("거래 금액 (원)").fill("10000");
+  await form.getByLabel("거래 방식").selectOption("direct");
+  const tomorrow = new Date(Date.now() + 86400000);
+  const date = new Date(
+    tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000,
+  )
+    .toISOString()
+    .slice(0, 16);
+  await form.getByLabel("약속 날짜·시간").fill(date);
+  await form.getByLabel("거래 장소").fill("서울역 1번 출구");
+  await form.getByLabel("추가 요청사항").fill("도착하면 알려주세요.");
+  await form.getByRole("button", { name: "닫기", exact: true }).click();
+  await page.getByRole("button", { name: "구매 제안", exact: true }).click();
+  await expect(form.getByLabel("거래 금액 (원)")).toHaveValue("10000");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/trade-proposal-mobile.png" });
+  await form.getByRole("button", { name: "제안 보내기" }).click();
+  await expect(form).toHaveCount(0);
+  await expect(page.getByText("구매 제안 · 응답 대기")).toBeVisible();
+  const roomUrl = page.url();
+  const sellerContext = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  try {
+    const other = await sellerContext.newPage();
+    await login(other, seller);
+    await other.goto(roomUrl);
+    await other
+      .getByRole("button", { name: "제안 확인하기", exact: true })
+      .click();
+    await expect(
+      other.getByText("거래 금액: 10,000원", { exact: true }),
+    ).toBeVisible();
+    await other.getByRole("button", { name: "수락", exact: true }).click();
+    await expect(
+      other.getByRole("dialog", { name: "약속 확정", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("구매 제안 · 약속 확정")).toBeVisible();
+    const product = await (
+      await request.get(`${documentsUrl}/products/${productId}`, {
+        headers: ownerHeaders,
+      })
+    ).json();
+    expect(product.fields.status.stringValue).toBe("reserved");
+    await page.getByRole("button", { name: "조건 변경", exact: true }).click();
+    await expect(form.getByLabel("거래 금액 (원)")).toHaveValue("10000");
+    await form.getByLabel("거래 금액 (원)").fill("9000");
+    await form.getByRole("button", { name: "제안 보내기" }).click();
+    await expect(page.getByText("구매 제안 · 응답 대기")).toBeVisible();
+    await other.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(
+      other.getByRole("button", { name: "제안 확인하기", exact: true }),
+    ).toHaveCount(2);
+    await other
+      .getByRole("button", { name: "제안 확인하기", exact: true })
+      .last()
+      .click();
+    await other.getByRole("button", { name: "거절", exact: true }).click();
+    await expect(page.getByText("구매 제안 · 거절됨")).toBeVisible();
+    await expect(page.getByText("구매 제안 · 약속 확정")).toBeVisible();
+    await page.reload();
+    await expect(page.getByText("구매 제안 · 약속 확정")).toBeVisible();
+  } finally {
+    await sellerContext.close();
+  }
+});
+
+test("교환 제안은 내 상품을 선택하고 수락 후 새 상품으로 변경할 수 있다", async ({
+  page,
+  browser,
+  request,
+  productIds,
+}) => {
+  const buyer = await createAccount(request, "교환 신청자");
+  const seller = await createAccount(request, "교환 등록자");
+  const target = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "exchange",
+  );
+  const first = await createProduct(request, productIds, buyer.userId, "sale");
+  const second = await createProduct(
+    request,
+    productIds,
+    buyer.userId,
+    "exchange",
+  );
+  await login(page, buyer);
+  await page.goto(`/products/${target}`);
+  await page.getByRole("button", { name: "채팅하기", exact: true }).click();
+  await page.getByRole("button", { name: "교환 제안", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "교환 제안", exact: true });
+  await expect(form.getByRole("radio")).toHaveCount(2);
+  await form.getByRole("radio", { name: /판매 채팅 테스트 상품/ }).check();
+  const date = new Date(Date.now() + 172800000);
+  await form
+    .getByLabel("발송 예정 날짜·시간")
+    .fill(
+      new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16),
+    );
+  await form.getByLabel("추가금 (원)").fill("3000");
+  await form.getByLabel("추가금 지급자").selectOption("seller");
+  await form.getByRole("button", { name: "제안 보내기" }).click();
+  await expect(form).toHaveCount(0);
+  const roomUrl = page.url();
+  const context = await browser.newContext({
+    baseURL: "http://127.0.0.1:3100",
+  });
+  try {
+    const other = await context.newPage();
+    await login(other, seller);
+    await other.goto(roomUrl);
+    await other.getByRole("button", { name: "제안 확인하기" }).click();
+    await expect(
+      other.getByText("추가금: 3,000원 (상품 등록자 지급)"),
+    ).toBeVisible();
+    await other.getByRole("button", { name: "수락", exact: true }).click();
+    await expect(page.getByText("교환 제안 · 약속 확정")).toBeVisible();
+    await page.getByRole("button", { name: "조건 변경" }).click();
+    await form.getByRole("radio", { name: /교환 채팅 테스트 상품/ }).check();
+    await form.getByRole("button", { name: "제안 보내기" }).click();
+    await expect(form).toHaveCount(0);
+    await other.getByRole("button", { name: "닫기", exact: true }).click();
+    await expect(
+      other.getByRole("button", { name: "제안 확인하기" }),
+    ).toHaveCount(2);
+    await other.getByRole("button", { name: "제안 확인하기" }).last().click();
+    await other.getByRole("button", { name: "수락", exact: true }).click();
+    await expect(
+      page.getByText("교환 제안 · 새 조건으로 변경됨"),
+    ).toBeVisible();
+    for (const [id, expected] of [
+      [first, "available"],
+      [second, "reserved"],
+      [target, "reserved"],
+    ]) {
+      const data = await (
+        await request.get(`${documentsUrl}/products/${id}`, {
+          headers: ownerHeaders,
+        })
+      ).json();
+      expect(data.fields.status.stringValue).toBe(expected);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
 test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({
   page,
   request,

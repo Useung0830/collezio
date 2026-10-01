@@ -1018,6 +1018,98 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
       },
     );
 
+    await t.test(
+      "동일 상품의 다른 채팅 예약 충돌과 수락·거절 동시 응답을 처리한다",
+      async () => {
+        const { createTradeProposal } =
+          await import("../../src/features/chat/api/createTradeProposal.ts");
+        const { respondToTradeProposal } =
+          await import("../../src/features/chat/api/respondToTradeProposal.ts");
+        const productId = await newProduct(sellerDb, seller.uid);
+        const terms = {
+          kind: "sale",
+          amount: 10000,
+          exchangeProductId: null,
+          extraAmount: 0,
+          extraPayer: "none",
+          method: "direct",
+          scheduledAt: Date.now() + 86400000,
+          location: "서울역",
+          shippingPayer: "requester",
+          notes: "",
+        };
+        const firstRoom = await createChatRoom({ productId, userId: user.uid });
+        const first = randomUUID();
+        await createTradeProposal(firstRoom, user.uid, first, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          stranger.email,
+          "Test1234!",
+        );
+        const secondRoom = await createChatRoom({
+          productId,
+          userId: stranger.uid,
+        });
+        const second = randomUUID();
+        await createTradeProposal(
+          secondRoom,
+          stranger.uid,
+          second,
+          terms,
+          null,
+        );
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        await respondToTradeProposal(firstRoom, seller.uid, first, "accepted");
+        await assert.rejects(
+          respondToTradeProposal(secondRoom, seller.uid, second, "accepted"),
+          /예약/,
+        );
+        await respondToTradeProposal(
+          secondRoom,
+          seller.uid,
+          second,
+          "rejected",
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().reservedByRoomId,
+          firstRoom,
+        );
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+        const raceRoom = await createChatRoom({
+          productId: await newProduct(sellerDb, seller.uid),
+          userId: user.uid,
+        });
+        const raceId = randomUUID();
+        await createTradeProposal(raceRoom, user.uid, raceId, terms, null);
+        await signInWithEmailAndPassword(
+          firebaseAuth,
+          seller.email,
+          "Test1234!",
+        );
+        const results = await Promise.allSettled([
+          respondToTradeProposal(raceRoom, seller.uid, raceId, "accepted"),
+          respondToTradeProposal(raceRoom, seller.uid, raceId, "rejected"),
+        ]);
+        assert.equal(
+          results.filter((result) => result.status === "fulfilled").length,
+          1,
+        );
+        const state = (
+          await getDocFromServer(
+            doc(firebaseDb, "chatRooms", raceRoom, "trade", "state"),
+          )
+        ).data();
+        assert.equal(state.pendingId, null);
+        await signInWithEmailAndPassword(firebaseAuth, user.email, "Test1234!");
+      },
+    );
+
     await t.test("로그아웃 후 이전 사용자 데이터 요청을 차단한다", async () => {
       await signOut(firebaseAuth);
       await assert.rejects(

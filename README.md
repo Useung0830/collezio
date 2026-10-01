@@ -32,6 +32,16 @@ npm run build
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage "node --test tests/integration/chat.rules.test.mjs && npx playwright test tests/e2e/chat.spec.ts"
 ```
 
+## 채팅 거래 제안
+
+- 구매자(채팅 요청자)가 구매·교환 조건을 제안합니다. 교환은 본인이 등록한 거래 가능한 상품 한 개를 선택하며 추가금과 지급자를 지정할 수 있습니다. 직거래는 약속 시각과 장소, 택배는 발송 예정 시각과 배송비 부담자를 입력합니다.
+- 제안은 `chatRooms/{roomId}/proposals/{proposalId}`에 저장하고 같은 ID의 채팅 메시지로 연결합니다. `trade/state`는 대기 중인 제안과 확정 제안을 가리킵니다. 방마다 대기 중인 제안은 하나이며, 실패 시 같은 요청 ID로 재시도해 중복 전송을 막습니다.
+- 받은 사람은 수락·거절, 보낸 사람은 철회할 수 있습니다. 수락하면 상품 예약과 제안 상태를 한 트랜잭션으로 갱신합니다. 다른 방에서 예약한 상품이나 차단된 상대와의 수락은 거부합니다. 교환은 양쪽 상품을 함께 예약합니다.
+- 확정 후에는 양쪽 모두 조건 변경을 제안할 수 있습니다. 교환 상품 변경은 해당 상품 소유자인 채팅 요청자만 UI에서 선택합니다. 변경 제안이 대기·거절·철회 상태일 때 기존 조건과 예약은 유지합니다. 수락하면 이전 제안을 `superseded`로 남기고, 교체된 교환 상품 예약을 해제합니다.
+- 입력 중인 조건은 해당 탭의 세션 저장소에 보관합니다. 상품 등록은 새 탭에서 열고 돌아온 뒤 목록을 새로고침할 수 있습니다. 결제, 배송 추적, 거래 완료·확정 거래 취소는 별도 기능입니다.
+- 앱 반영 전에 `npx firebase deploy --only firestore:rules --project <project-id>`로 규칙을 배포해야 합니다. 에뮬레이터 테스트 성공은 운영 규칙 배포를 의미하지 않습니다.
+- 검증: `npm run test:unit`, 위의 채팅 통합 테스트 및 E2E 명령을 실행합니다. 구매 수락·조건 변경 거절, 교환 상품 교체, 동시 응답, 다른 채팅의 예약 충돌과 모바일 크기 모달을 검증합니다. 실제 휴대폰 검증과 모바일 뷰포트 검증은 구분합니다.
+
 ## Getting Started
 
 First, run the development server:
