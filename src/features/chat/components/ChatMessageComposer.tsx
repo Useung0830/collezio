@@ -138,14 +138,14 @@ export default function ChatMessageComposer({
           {imageError}
         </p>
       )}
-      <div className="flex items-center gap-2">
+      <div className="flex items-end gap-2">
         <button
           type="button"
           disabled={disabled || mutation.isPending}
           onClick={() => fileInput.current?.click()}
           aria-label="사진 첨부"
           title="사진 첨부"
-          className="text-black-400 flex size-9 shrink-0 items-center justify-center disabled:cursor-not-allowed"
+          className="text-black-400 mb-1 flex size-9 shrink-0 items-center justify-center disabled:cursor-not-allowed"
         >
           <svg
             viewBox="0 0 24 24"
@@ -156,7 +156,7 @@ export default function ChatMessageComposer({
             <path d="M8 4 6.5 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2.5L16 4H8Zm4 5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z" />
           </svg>
         </button>
-        <div className="border-black-200 focus-within:ring-black-400 flex min-w-0 flex-1 items-center gap-2 rounded-3xl border bg-white px-3 py-1.5 focus-within:ring-1">
+        <div className="border-black-200 focus-within:ring-black-400 flex min-w-0 flex-1 items-end gap-2 rounded-3xl border bg-white px-3 py-1.5 focus-within:ring-1">
           <label className="flex min-w-0 flex-1">
             <span className="sr-only">메시지</span>
             <textarea
@@ -178,7 +178,7 @@ export default function ChatMessageComposer({
             }
             aria-busy={mutation.isPending}
             title={mutation.isError ? "다시 보내기" : "메시지 전송"}
-            className="bg-black-600 hover:bg-black-900 focus-visible:outline-black-900 disabled:bg-black-300 flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
+            className="bg-black-600 hover:bg-black-900 focus-visible:outline-black-900 disabled:bg-black-300 mb-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
             aria-label="메시지 전송"
           >
             <svg
