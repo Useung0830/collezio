@@ -2,11 +2,31 @@ import { randomUUID } from "node:crypto";
 
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { expect, test } from "./fixtures";
+import { expect, test as base } from "./fixtures";
 
 const documentsUrl =
   "http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents";
 const ownerHeaders = { Authorization: "Bearer owner" };
+
+const test = base.extend<{ productIds: string[] }>({
+  productIds: async ({ request }, runWithProducts) => {
+    const productIds: string[] = [];
+    try {
+      await runWithProducts(productIds);
+    } finally {
+      const responses = await Promise.all(
+        productIds.map((productId) =>
+          request.delete(`${documentsUrl}/products/${productId}`, {
+            headers: ownerHeaders,
+          }),
+        ),
+      );
+      for (const response of responses) {
+        expect(response.ok() || response.status() === 404).toBeTruthy();
+      }
+    }
+  },
+});
 
 async function createAccount(request: APIRequestContext, nickname: string) {
   const email = `${randomUUID()}@example.com`;
@@ -43,10 +63,12 @@ async function login(page: Page, account: { email: string; password: string }) {
 
 async function createProduct(
   request: APIRequestContext,
+  productIds: string[],
   sellerId: string,
   type: "sale" | "exchange",
 ) {
   const productId = randomUUID();
+  productIds.push(productId);
   const response = await request.patch(
     `${documentsUrl}/products/${productId}`,
     {
@@ -94,11 +116,17 @@ async function createProduct(
 test("신고와 차단은 연결 실패 후 재시도할 수 있다", async ({
   page,
   request,
+  productIds,
   context,
 }) => {
   const requester = await createAccount(request, "재시도 신고자");
   const seller = await createAccount(request, "재시도 대상");
-  const productId = await createProduct(request, seller.userId, "exchange");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "exchange",
+  );
   await login(page, requester);
   await page.goto(`/products/${productId}`);
   await page.getByRole("button", { name: "채팅하기", exact: true }).click();
@@ -157,13 +185,20 @@ test("신고와 차단은 연결 실패 후 재시도할 수 있다", async ({
 test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 해제해야 전송된다", async ({
   page,
   request,
+  productIds,
   browser,
 }) => {
   const requester = await createAccount(request, "차단 신청자");
   const seller = await createAccount(request, "차단 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   const secondProductId = await createProduct(
     request,
+    productIds,
     seller.userId,
     "exchange",
   );
@@ -265,10 +300,16 @@ test("차단은 다른 탭과 상대방에 반영되고 상호 차단을 모두 
 test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 유지된다", async ({
   page,
   request,
+  productIds,
 }) => {
   const requester = await createAccount(request, "신고 신청자");
   const seller = await createAccount(request, "신고 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   await login(page, requester);
   await page.goto(`/products/${productId}`);
   await page.getByRole("button", { name: "채팅하기", exact: true }).click();
@@ -302,10 +343,16 @@ test("채팅 상대 신고는 기타 내용 입력 후 접수되고 대화는 �
 test("채팅 목록에서 뒤로가면 채팅을 시작한 상품 상세로 돌아간다", async ({
   page,
   request,
+  productIds,
 }) => {
   const requester = await createAccount(request, "뒤로가기 신청자");
   const seller = await createAccount(request, "뒤로가기 판매자");
-  const productId = await createProduct(request, seller.userId, "exchange");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "exchange",
+  );
   const productUrl = `http://127.0.0.1:3100/products/${productId}`;
 
   await login(page, requester);
@@ -329,13 +376,19 @@ test("채팅 목록에서 뒤로가면 채팅을 시작한 상품 상세로 돌�
 test("상품별 채팅방 생성·재진입·내 목록 표시와 판매자 비공개", async ({
   page,
   request,
+  productIds,
 }) => {
   const requester = await createAccount(request, "채팅 신청자");
   const seller = await createAccount(request, "테스트 판매자");
   await login(page, requester);
   const roomUrls: string[] = [];
   for (const type of ["sale", "exchange"] as const) {
-    const productId = await createProduct(request, seller.userId, type);
+    const productId = await createProduct(
+      request,
+      productIds,
+      seller.userId,
+      type,
+    );
     await page.goto(`/products/${productId}`);
     const button = page.getByRole("button", { name: "채팅하기", exact: true });
     await expect(button).toBeEnabled();
@@ -421,12 +474,18 @@ test("상품별 채팅방 생성·재진입·내 목록 표시와 판매자 비�
 test("첫 전송 이후 상대방 목록에 나타나고 두 계정이 실시간으로 대화한다", async ({
   page,
   request,
+  productIds,
   browser,
   context,
 }) => {
   const requester = await createAccount(request, "대화 신청자");
   const seller = await createAccount(request, "대화 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   const sellerContext = await browser.newContext({
     baseURL: "http://127.0.0.1:3100",
   });
@@ -536,10 +595,16 @@ test("첫 전송 이후 상대방 목록에 나타나고 두 계정이 실시간
 test("첫 전송 실패 시 입력을 보존하고 재시도 후 한 번만 저장한다", async ({
   page,
   request,
+  productIds,
 }) => {
   const requester = await createAccount(request, "재시도 신청자");
   const seller = await createAccount(request, "재시도 판매자");
-  const productId = await createProduct(request, seller.userId, "exchange");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "exchange",
+  );
   const productUrl = `${documentsUrl}/products/${productId}`;
   const originalProduct = await (
     await request.get(productUrl, { headers: ownerHeaders })
@@ -600,9 +665,15 @@ test("첫 전송 실패 시 입력을 보존하고 재시도 후 한 번만 저�
 test("비로그인과 본인 상품에서는 채팅방 생성 제한", async ({
   page,
   request,
+  productIds,
 }) => {
   const seller = await createAccount(request, "본인 판매자");
-  const productId = await createProduct(request, seller.userId, "sale");
+  const productId = await createProduct(
+    request,
+    productIds,
+    seller.userId,
+    "sale",
+  );
   await page.goto(`/products/${productId}`);
   const button = page.getByRole("button", { name: "채팅하기", exact: true });
   await expect(button).toBeEnabled();
