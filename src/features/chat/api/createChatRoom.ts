@@ -7,6 +7,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+import { validateChatAccess } from "@/features/chat/api/validateChatAccess";
 import { validateChatDocumentId } from "@/features/chat/utils/validateChatDocumentId";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
@@ -59,6 +60,7 @@ export async function createChatRoom({
       }
 
       // 사용자·상품별 연결 문서를 함께 생성하여 동시 요청도 같은 방을 사용합니다.
+      await validateChatAccess(transaction, userId, sellerId);
       transaction.set(linkRef, { roomId: roomRef.id });
       transaction.set(roomRef, {
         productId,

@@ -2,6 +2,38 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function canChat(firstId, secondId) {
+      return !existsAfter(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
+        && !existsAfter(/databases/$(database)/documents/users/$(secondId)/chatBlocks/$(firstId));
+    }
+    match /users/{userId}/chatBlocks/{partnerId} {
+      // 상대방은 자신과의 차단 여부만 조회할 수 있고 전체 목록은 읽을 수 없습니다.
+      allow get: if request.auth != null && request.auth.uid in [userId, partnerId];
+      allow list: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId && userId != partnerId
+        && request.resource.data.keys().hasAll(['createdAt'])
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/chatReports/{reportId} {
+      function isValidReport() {
+        let data = request.resource.data;
+        let room = get(/databases/$(database)/documents/chatRooms/$(data.roomId)).data;
+        return data.keys().hasAll(['partnerId', 'roomId', 'reason', 'details', 'createdAt'])
+          && data.keys().hasOnly(['partnerId', 'roomId', 'reason', 'details', 'createdAt'])
+          && data.roomId is string && data.partnerId is string
+          && request.auth.uid in room.visibleTo && userId != data.partnerId
+          && ((room.requesterId == userId && room.sellerId == data.partnerId)
+            || (room.sellerId == userId && room.requesterId == data.partnerId))
+          && data.reason in ['스팸·광고', '사기 의심', '욕설·괴롭힘', '부적절한 콘텐츠', '기타']
+          && data.details is string && data.details.size() <= 1000
+          && (data.reason != '기타' || data.details.matches('(?s).*\\S.*'))
+          && data.createdAt == request.time;
+      }
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId && isValidReport();
+    }
     function isCommunityOwner(authorId) {
       return request.auth != null && request.auth.uid == authorId;
     }
@@ -158,6 +190,7 @@ service cloud.firestore {
       }
       function isValidMessageUpdate() {
         return request.auth.uid in resource.data.visibleTo
+          && canChat(resource.data.requesterId, resource.data.sellerId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'visibleTo', 'lastMessage'])
           && request.resource.data.status == 'active'
           && request.resource.data.visibleTo == [resource.data.requesterId, resource.data.sellerId]
@@ -177,6 +210,7 @@ service cloud.firestore {
           && data.requesterId == request.auth.uid
           && data.sellerId is string && data.sellerId != request.auth.uid
           && data.sellerId == get(productPath).data.sellerId
+          && canChat(data.requesterId, data.sellerId)
           && data.status == 'draft' && data.visibleTo == [request.auth.uid]
           && data.createdAt == request.time
           && !exists(linkPath) && getAfter(linkPath).data.roomId == roomId;
@@ -194,7 +228,8 @@ service cloud.firestore {
         function matchesRoomSummary() {
           let room = getAfter(/databases/$(database)/documents/chatRooms/$(roomId)).data;
           let data = request.resource.data;
-          return room.status == 'active' && room.lastMessage.id == messageId
+          return canChat(room.requesterId, room.sellerId)
+            && room.status == 'active' && room.lastMessage.id == messageId
             && room.lastMessage.content == data.content && room.lastMessage.senderId == data.senderId
             && room.lastMessage.createdAt == data.createdAt;
         }
