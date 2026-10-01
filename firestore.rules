@@ -163,6 +163,24 @@ service cloud.firestore {
     }
 
     match /chatRooms/{roomId} {
+      match /imageUploads/{messageId} {
+        function canUpload() {
+          let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+          return request.auth != null && request.auth.uid in room.visibleTo
+            && canChat(room.requesterId, room.sellerId);
+        }
+        allow get: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.visibleTo;
+        allow create, update: if canUpload()
+          && request.resource.data.keys().hasAll(['senderId', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['senderId', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && messageId.matches('^[a-zA-Z0-9-]+-0$') && messageId.size() <= 128
+          && !exists(/databases/$(database)/documents/chatRooms/$(roomId)/messages/$(messageId))
+          && (!exists(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId))
+            || resource.data.senderId == request.auth.uid);
+      }
       function isValidMessage(data) {
         return data.keys().hasAll(['content', 'senderId', 'createdAt'])
           && data.keys().hasOnly(['content', 'senderId', 'createdAt'])
