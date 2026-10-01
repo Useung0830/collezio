@@ -21,10 +21,34 @@ export function parseChatMessage(id: string, value: unknown): ChatMessage {
   }
   validateChatDocumentId(id);
   validateChatDocumentId(data.senderId);
+  if (
+    data.imagePath !== undefined &&
+    (typeof data.imagePath !== "string" ||
+      !data.imagePath.startsWith("chat/") ||
+      data.imagePath.split("/").length !== 4 ||
+      data.imagePath.split("/")[2] !== data.senderId ||
+      data.imagePath.split("/")[3] !== id ||
+      data.content !== "사진" ||
+      data.previousMessageId !== undefined)
+  )
+    throw new Error("이미지 메시지를 확인할 수 없습니다.");
+  if (
+    data.previousMessageId !== undefined &&
+    (typeof data.previousMessageId !== "string" ||
+      !id.endsWith("-1") ||
+      data.previousMessageId !== `${id.slice(0, -2)}-0`)
+  )
+    throw new Error("메시지 순서를 확인할 수 없습니다.");
   return {
     id,
     content: data.content,
     senderId: data.senderId,
     createdAt: data.createdAt.toDate().toISOString(),
+    ...(typeof data.imagePath === "string"
+      ? { imagePath: data.imagePath }
+      : {}),
+    ...(typeof data.previousMessageId === "string"
+      ? { previousMessageId: data.previousMessageId }
+      : {}),
   };
 }

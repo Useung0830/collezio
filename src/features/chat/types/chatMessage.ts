@@ -3,6 +3,8 @@ export interface ChatMessage {
   content: string;
   senderId: string;
   createdAt: string;
+  imagePath?: string;
+  previousMessageId?: string;
 }
 
 export interface SendChatMessageInput {
@@ -10,4 +12,5 @@ export interface SendChatMessageInput {
   messageId: string;
   userId: string;
   content: string;
+  image?: File;
 }
