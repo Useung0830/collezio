@@ -55,6 +55,12 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     await import("../../src/features/chat/api/sendChatMessage.ts");
   const { getChatMessages } =
     await import("../../src/features/chat/api/getChatMessages.ts");
+  const { createChatReport } =
+    await import("../../src/features/chat/api/createChatReport.ts");
+  const { updateChatBlock } =
+    await import("../../src/features/chat/api/updateChatBlock.ts");
+  const { getChatBlockStatus } =
+    await import("../../src/features/chat/api/getChatBlockStatus.ts");
   const sellerApp = initializeApp(
     { projectId: "demo-collezio", apiKey: "demo-key" },
     "chat-seller",
@@ -452,6 +458,145 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
           await assert.rejects(batch.commit(), denied);
         }
         assert.equal((await getChatMessages(roomId, user.uid)).length, 4);
+      },
+    );
+
+    await t.test(
+      "신고 재시도는 중복 생성하지 않고 타인 조회와 위조를 거부한다",
+      async () => {
+        const input = {
+          userId: user.uid,
+          partnerId: seller.uid,
+          roomId,
+          reportId: randomUUID(),
+          reason: "사기 의심",
+          details: "거래 조건 확인 요청",
+        };
+        await createChatReport(input);
+        const ref = doc(
+          firebaseDb,
+          "users",
+          user.uid,
+          "chatReports",
+          input.reportId,
+        );
+        const before = (await getDocFromServer(ref)).data();
+        await createChatReport(input);
+        assert.deepEqual((await getDocFromServer(ref)).data(), before);
+        await assert.rejects(createChatReport({ ...input, details: "변조" }));
+        for (const db of [sellerDb, strangerDb]) {
+          await assert.rejects(
+            getDocFromServer(
+              doc(db, "users", user.uid, "chatReports", input.reportId),
+            ),
+            denied,
+          );
+        }
+        await assert.rejects(
+          createChatReport({
+            ...input,
+            reportId: randomUUID(),
+            partnerId: stranger.uid,
+          }),
+          denied,
+        );
+        await assert.rejects(updateDoc(ref, { details: "수정" }), denied);
+        await assert.rejects(
+          setDoc(
+            doc(firebaseDb, "users", user.uid, "chatReports", randomUUID()),
+            {
+              ...before,
+              reason: "기타",
+              details: "  ",
+              createdAt: serverTimestamp(),
+            },
+          ),
+          denied,
+        );
+      },
+    );
+
+    await t.test(
+      "사용자 차단은 양쪽 전송과 새 방 생성을 막고 기존 대화는 보존한다",
+      async () => {
+        const input = { userId: user.uid, partnerId: seller.uid, roomId };
+        await updateChatBlock({ ...input, isBlocked: true });
+        await updateChatBlock({ ...input, isBlocked: true });
+        assert.deepEqual(await getChatBlockStatus(user.uid, seller.uid), {
+          isBlockedByMe: true,
+          isBlockedByPartner: false,
+        });
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 4);
+        const otherProductId = await newProduct(sellerDb, seller.uid);
+        await assert.rejects(
+          createChatRoom({ productId: otherProductId, userId: user.uid }),
+        );
+        for (const [db, senderId] of [
+          [firebaseDb, user.uid],
+          [sellerDb, seller.uid],
+        ]) {
+          const messageId = randomUUID();
+          const message = {
+            senderId,
+            content: "차단 우회",
+            createdAt: serverTimestamp(),
+          };
+          const batch = writeBatch(db);
+          batch.set(
+            doc(db, "chatRooms", roomId, "messages", messageId),
+            message,
+          );
+          batch.update(doc(db, "chatRooms", roomId), {
+            lastMessage: { id: messageId, ...message },
+          });
+          await assert.rejects(batch.commit(), denied);
+        }
+        await assert.rejects(
+          getDocs(collection(sellerDb, "users", user.uid, "chatBlocks")),
+          denied,
+        );
+        await assert.rejects(
+          getDocFromServer(
+            doc(strangerDb, "users", user.uid, "chatBlocks", seller.uid),
+          ),
+          denied,
+        );
+        await assert.rejects(
+          updateDoc(
+            doc(sellerDb, "users", user.uid, "chatBlocks", seller.uid),
+            { createdAt: serverTimestamp() },
+          ),
+          denied,
+        );
+        await setDoc(
+          doc(sellerDb, "users", seller.uid, "chatBlocks", user.uid),
+          { createdAt: serverTimestamp() },
+        );
+        await updateChatBlock({ ...input, isBlocked: false });
+        assert.deepEqual(await getChatBlockStatus(user.uid, seller.uid), {
+          isBlockedByMe: false,
+          isBlockedByPartner: true,
+        });
+        await assert.rejects(
+          sendChatMessage({
+            roomId,
+            userId: user.uid,
+            messageId: randomUUID(),
+            content: "상호 차단",
+          }),
+        );
+        const batch = writeBatch(sellerDb);
+        batch.delete(
+          doc(sellerDb, "users", seller.uid, "chatBlocks", user.uid),
+        );
+        await batch.commit();
+        await sendChatMessage({
+          roomId,
+          userId: user.uid,
+          messageId: randomUUID(),
+          content: "해제 후 전송",
+        });
+        assert.equal((await getChatMessages(roomId, user.uid)).length, 5);
       },
     );
 
