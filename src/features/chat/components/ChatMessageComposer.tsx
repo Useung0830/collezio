@@ -1,10 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import ChatImagePreview from "@/features/chat/components/ChatImagePreview";
 import { MAX_CHAT_MESSAGE_LENGTH } from "@/features/chat/constants/chat";
 import { useSendChatMessageMutation } from "@/features/chat/hooks/useSendChatMessageMutation";
 import type { SendChatMessageInput } from "@/features/chat/types/chatMessage";
+import {
+  CHAT_IMAGE_TYPES,
+  validateChatImage,
+} from "@/features/chat/utils/validateChatImage";
 
 interface ChatMessageComposerProps {
   roomId: string;
@@ -19,28 +24,77 @@ export default function ChatMessageComposer({
 }: ChatMessageComposerProps) {
   const mutation = useSendChatMessageMutation();
   const [content, setContent] = useState("");
+  const [attachment, setAttachment] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const previewUrl = useRef<string | null>(null);
   const previousRequest = useRef<SendChatMessageInput | null>(null);
+  const isSubmitting = useRef(false);
+
+  const clearAttachment = () => {
+    if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    previewUrl.current = null;
+    setAttachment(null);
+    setImageError(null);
+  };
+  const handleSelectImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || disabled || mutation.isPending) return;
+    try {
+      validateChatImage(file);
+      clearAttachment();
+      const url = URL.createObjectURL(file);
+      previewUrl.current = url;
+      setAttachment({ file, url });
+    } catch (error) {
+      setImageError(
+        error instanceof Error ? error.message : "이미지를 확인해주세요.",
+      );
+    }
+  };
+  useEffect(
+    () => () => {
+      if (previewUrl.current) URL.revokeObjectURL(previewUrl.current);
+    },
+    [],
+  );
 
   const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = content.trim();
     if (
-      !text ||
+      (!text && !attachment) ||
       text.length > MAX_CHAT_MESSAGE_LENGTH ||
       disabled ||
-      mutation.isPending
+      mutation.isPending ||
+      isSubmitting.current
     )
       return;
     const previous = previousRequest.current;
     const request =
-      previous?.content === text
+      previous?.content === text && previous.image === attachment?.file
         ? previous
-        : { roomId, userId, content: text, messageId: crypto.randomUUID() };
+        : {
+            roomId,
+            userId,
+            content: text,
+            messageId: crypto.randomUUID(),
+            ...(attachment ? { image: attachment.file } : {}),
+          };
     previousRequest.current = request;
+    isSubmitting.current = true;
     mutation.mutate(request, {
       onSuccess: () => {
         setContent("");
+        clearAttachment();
         previousRequest.current = null;
+      },
+      onSettled: () => {
+        isSubmitting.current = false;
       },
     });
   };
@@ -62,12 +116,35 @@ export default function ChatMessageComposer({
       onSubmit={handleSubmit}
       className="flex shrink-0 flex-col gap-2 pb-[env(safe-area-inset-bottom)]"
     >
+      <input
+        ref={fileInput}
+        type="file"
+        accept={CHAT_IMAGE_TYPES.join(",")}
+        aria-label="채팅 이미지 선택"
+        className="sr-only"
+        tabIndex={-1}
+        disabled={disabled || mutation.isPending}
+        onChange={handleSelectImage}
+      />
+      {attachment && (
+        <ChatImagePreview
+          url={attachment.url}
+          disabled={disabled || mutation.isPending}
+          onRemove={clearAttachment}
+        />
+      )}
+      {imageError && (
+        <p role="alert" className="text-body-14 text-black-900">
+          {imageError}
+        </p>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="button"
-          disabled
-          aria-label="사진 첨부 (준비 중)"
-          title="사진 전송 기능 준비 중"
+          disabled={disabled || mutation.isPending}
+          onClick={() => fileInput.current?.click()}
+          aria-label="사진 첨부"
+          title="사진 첨부"
           className="text-black-400 flex size-9 shrink-0 items-center justify-center disabled:cursor-not-allowed"
         >
           <svg
@@ -96,7 +173,9 @@ export default function ChatMessageComposer({
           </label>
           <button
             type="submit"
-            disabled={!content.trim() || disabled || mutation.isPending}
+            disabled={
+              (!content.trim() && !attachment) || disabled || mutation.isPending
+            }
             aria-busy={mutation.isPending}
             title={mutation.isError ? "다시 보내기" : "메시지 전송"}
             className="bg-black-600 hover:bg-black-900 focus-visible:outline-black-900 disabled:bg-black-300 flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed"
