@@ -79,6 +79,7 @@ export default function RegisteredChatRoom({
         </div>
       )}
       <ChatConversation
+        requesterId={query.data.requesterId}
         isPartnerWithdrawn={query.data.isPartnerWithdrawn}
         key={`conversation:${roomId}:${query.userId}`}
         roomId={roomId}
