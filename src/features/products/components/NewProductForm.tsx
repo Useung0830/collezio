@@ -116,6 +116,7 @@ export default function NewProductForm() {
       {
         onSuccess: () => {
           toast.success("상품이 등록되었습니다.");
+          router.replace("/collections");
         },
         onError: () => {
           toast.error(
