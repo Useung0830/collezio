@@ -1,7 +1,7 @@
 import { FirebaseError } from "firebase/app";
 
 type SignupError = {
-  field: "email" | "password" | "root.server";
+  field: "email" | "password" | "nickname" | "root.server";
   message: string;
 };
 
@@ -14,6 +14,10 @@ export function getSignupError(error: unknown): SignupError {
   }
 
   switch (error.code) {
+    case "functions/already-exists":
+      return { field: "nickname", message: "이미 사용 중인 닉네임입니다." };
+    case "functions/invalid-argument":
+      return { field: "nickname", message: "닉네임은 2~10자로 입력해주세요." };
     case "auth/email-already-in-use":
       return { field: "email", message: "이미 사용 중인 이메일입니다." };
     case "auth/invalid-email":

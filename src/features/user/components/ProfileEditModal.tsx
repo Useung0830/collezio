@@ -9,6 +9,7 @@ import ProfileImageField from "@/features/user/components/ProfileImageField";
 import { useProfileEditDialog } from "@/features/user/hooks/useProfileEditDialog";
 import { useUpdateProfileMutation } from "@/features/user/hooks/useUpdateProfileMutation";
 import type { PublicProfile } from "@/features/user/types/profile";
+import { getNicknameError } from "@/features/user/utils/getNicknameError";
 import { validateProfileNickname } from "@/features/user/utils/validateProfile";
 
 type ProfileEditModalProps = {
@@ -48,9 +49,10 @@ export default function ProfileEditModal({
       onClose();
     } catch (error) {
       setError(
-        error instanceof Error && !("code" in error)
-          ? error.message
-          : "프로필을 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.",
+        getNicknameError(error) ??
+          (error instanceof Error && !("code" in error)
+            ? error.message
+            : "프로필을 저장하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요."),
       );
     } finally {
       submittingRef.current = false;

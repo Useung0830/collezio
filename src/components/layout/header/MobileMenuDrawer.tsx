@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 
 import Button from "@/components/common/button/Button";
@@ -8,10 +7,12 @@ import IconButton from "@/components/common/button/IconButton";
 import LinkButton from "@/components/common/button/LinkButton";
 import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
 import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
+import ProfileAvatar from "@/features/user/components/ProfileAvatar";
+import { useProfileUserId } from "@/features/user/hooks/useProfileUserId";
+import { usePublicProfileQuery } from "@/features/user/hooks/usePublicProfileQuery";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 import RightIcon from "@/assets/icons/icon-right.svg";
-import profileImage from "@/assets/images/profile.png";
 
 type MobileMenuDrawerProps = {
   isLoggedIn: boolean;
@@ -32,6 +33,10 @@ export default function MobileMenuDrawer({
   isOpen,
   onClose,
 }: MobileMenuDrawerProps) {
+  const userId = useProfileUserId();
+  const { data: profile, isPending } = usePublicProfileQuery(
+    isLoggedIn ? userId : null,
+  );
   const [isExchangeOpen, setIsExchangeOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -96,16 +101,22 @@ export default function MobileMenuDrawer({
               className="flex min-w-0 items-center gap-2"
               onClick={onClose}
             >
-              <Image
-                src={profileImage}
-                alt="컬렉션 모아모아 프로필"
-                width={32}
-                height={32}
-                className="rounded-full"
+              <ProfileAvatar
+                imageUrl={profile?.imageUrl ?? null}
+                nickname={profile?.nickname ?? "내"}
+                size="compact"
+                isLoading={isPending}
               />
-              <span className="text-label-14 text-black-900 truncate">
-                컬렉션 모아모아
-              </span>
+              {isPending ? (
+                <span
+                  aria-hidden="true"
+                  className="bg-black-100 h-4 w-24 rounded motion-safe:animate-pulse"
+                />
+              ) : (
+                <span className="text-label-14 text-black-900 truncate">
+                  {profile?.nickname ?? "마이페이지"}
+                </span>
+              )}
             </Link>
           ) : (
             <div className="flex items-center gap-2">

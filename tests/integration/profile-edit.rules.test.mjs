@@ -7,15 +7,16 @@ import {
   connectAuthEmulator,
   createUserWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from "firebase/auth";
 import {
   connectFirestoreEmulator,
   doc,
   getDocFromServer,
   serverTimestamp,
-  setDoc,
   updateDoc,
 } from "firebase/firestore";
+import { connectFunctionsEmulator } from "firebase/functions";
 import {
   connectStorageEmulator,
   deleteObject,
@@ -43,10 +44,18 @@ test("프로필 수정 API와 사진 소유권·집계 보호", async () => {
       return nextResolve(specifier, context);
     },
   });
-  const { firebaseApp, firebaseAuth, firebaseDb, firebaseStorage } =
-    await import("../../src/lib/firebase.ts");
+  const {
+    firebaseApp,
+    firebaseAuth,
+    firebaseDb,
+    firebaseStorage,
+    firebaseFunctions,
+  } = await import("../../src/lib/firebase.ts");
   const { updatePublicProfile } =
     await import("../../src/features/user/api/updatePublicProfile.ts");
+  const { createPublicProfile } =
+    await import("../../src/features/user/api/createPublicProfile.ts");
+  connectFunctionsEmulator(firebaseFunctions, "127.0.0.1", 5001);
   connectAuthEmulator(
     firebaseAuth,
     `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`,
@@ -67,12 +76,8 @@ test("프로필 수정 API와 사진 소유권·집계 보호", async () => {
       "Test1234!",
     );
     const own = doc(firebaseDb, "profiles", user.uid);
-    await setDoc(own, {
-      nickname: "기존닉네임",
-      imageUrl: null,
-      bio: "",
-      createdAt: serverTimestamp(),
-    });
+    await updateProfile(user, { displayName: "기존닉네임" });
+    await createPublicProfile(user.uid);
     const input = { userId: user.uid, nickname: " 새닉네임 ", image: null };
     assert.equal((await updatePublicProfile(input)).nickname, "새닉네임");
     assert.equal((await getDocFromServer(own)).data().nickname, "새닉네임");

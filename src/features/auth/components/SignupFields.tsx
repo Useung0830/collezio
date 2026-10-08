@@ -54,6 +54,7 @@ export default function SignupFields({
         error={errors.nickname?.message}
         registration={register("nickname", {
           required: "닉네임을 입력해주세요.",
+          setValueAs: (value: string) => value.trim(),
           minLength: {
             value: 2,
             message: "닉네임은 2자 이상이어야 합니다.",

@@ -44,9 +44,23 @@ test("기존 계정의 프로필을 생성하고 비로그인 방문자에게 �
   const editButton = ownProfile.getByRole("button", { name: "프로필 수정" });
   await editButton.click();
   const modal = page.getByRole("dialog", { name: "프로필 수정" });
+  const duplicateName = `중복${randomUUID().slice(0, 8)}`;
+  const duplicateProfile = await request.patch(
+    `http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents/profiles/${randomUUID()}`,
+    {
+      headers: { Authorization: "Bearer owner" },
+      data: { fields: { nickname: { stringValue: duplicateName } } },
+    },
+  );
+  expect(duplicateProfile.ok()).toBeTruthy();
   await expect(
     modal.getByRole("button", { name: "저장", exact: true }),
   ).toBeDisabled();
+  await modal.getByLabel("닉네임").fill(duplicateName);
+  await modal.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(
+    modal.getByText("이미 사용 중인 닉네임입니다.", { exact: true }),
+  ).toBeVisible();
   await modal.getByLabel("닉네임").fill("취소할이름");
   await page.keyboard.press("Escape");
   await expect(modal).not.toBeVisible();

@@ -9,6 +9,7 @@ import { getStorage } from "firebase-admin/storage";
 
 import { parseWithdrawalFeedback } from "../src/parseWithdrawalFeedback.js";
 import { processWithdrawal } from "../src/processWithdrawal.js";
+import { getNicknameKey } from "../src/profileNickname.js";
 
 test("피드백은 선택사항이며 코드·길이·중복·추가 필드를 검증한다", () => {
   assert.deepEqual(parseWithdrawalFeedback({ reasons: [], detail: "  " }), {
@@ -71,6 +72,8 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
     postId: ownPost.id,
   });
   batch.set(db.doc(`profiles/${id}`), { nickname: "삭제할 닉네임" });
+  const nicknameClaim = db.doc(`nicknames/${getNicknameKey("삭제할 닉네임")}`);
+  batch.set(nicknameClaim, { userId: id });
   batch.set(room, {
     requesterId: "other",
     sellerId: id,
@@ -114,6 +117,7 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   assert.equal((await ownProduct.get()).exists, false);
   assert.equal((await ownPost.get()).exists, false);
   assert.equal((await db.doc(`profiles/${id}`).get()).exists, false);
+  assert.equal((await nicknameClaim.get()).exists, false);
   assert.equal(
     (await db.doc(`communityComments/related-${suffix}`).get()).exists,
     false,
