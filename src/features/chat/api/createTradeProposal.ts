@@ -54,6 +54,11 @@ export async function createTradeProposal(
       throw new Error(
         "확정 조건이 변경되었습니다. 창을 닫고 다시 확인해주세요.",
       );
+    if (previousId) {
+      const completion = await tx.get(doc(roomRef, "completions", previousId));
+      if (completion.data()?.confirmedBy?.length === 2)
+        throw new Error("완료된 거래의 조건은 변경할 수 없습니다.");
+    }
     if (!previousId && userId !== room.requesterId)
       throw new Error("첫 제안은 구매·교환 신청자가 보낼 수 있습니다.");
     await validateChatAccess(tx, room.requesterId, room.sellerId);

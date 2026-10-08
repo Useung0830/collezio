@@ -10,6 +10,7 @@ interface ChatConversationProps {
   roomId: string;
   userId: string;
   partnerId: string;
+  requesterId: string;
   isPartnerWithdrawn: boolean;
 }
 
@@ -17,6 +18,7 @@ export default function ChatConversation({
   roomId,
   userId,
   partnerId,
+  requesterId,
   isPartnerWithdrawn,
 }: ChatConversationProps) {
   const query = useChatMessagesQuery(roomId, userId);
@@ -46,6 +48,7 @@ export default function ChatConversation({
           roomId={roomId}
           messages={query.data}
           userId={userId}
+          requesterId={requesterId}
         />
       ) : (
         <div className="text-body-14 text-black-900 flex flex-1 flex-col items-center justify-center gap-2 px-3 text-center">

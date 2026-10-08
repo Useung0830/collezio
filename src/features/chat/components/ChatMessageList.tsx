@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import ChatMessageImage from "@/features/chat/components/ChatMessageImage";
+import TradeCompletionNotice from "@/features/chat/components/TradeCompletionNotice";
 import TradeProposalCard from "@/features/chat/components/TradeProposalCard";
 import type { ChatMessage } from "@/features/chat/types/chatMessage";
 
@@ -12,12 +13,14 @@ interface ChatMessageListProps {
   roomId: string;
   messages: ChatMessage[];
   userId: string;
+  requesterId: string;
 }
 
 export default function ChatMessageList({
   roomId,
   messages,
   userId,
+  requesterId,
 }: ChatMessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const lastMessageId = messages.at(-1)?.id;
@@ -87,6 +90,11 @@ export default function ChatMessageList({
             </li>
           );
         })}
+        <TradeCompletionNotice
+          roomId={roomId}
+          userId={userId}
+          requesterId={requesterId}
+        />
       </ul>
       <div ref={endRef} />
     </div>

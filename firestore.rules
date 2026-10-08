@@ -179,6 +179,13 @@ service cloud.firestore {
         return exists(path) ? get(path).data : {'pendingId': null, 'acceptedId': null};
       }
       function tradeStateAfter() { return getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/trade/state).data; }
+      function completionBefore(proposalId) {
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId);
+        return exists(path) ? get(path).data : {'confirmedBy': [], 'deferredBy': [], 'reviewedBy': []};
+      }
+      function isTradeCompleted() {
+        return tradeState().acceptedId != null && completionBefore(tradeState().acceptedId).confirmedBy.size() == 2;
+      }
       function availableForTrade(productId, ownerId) {
         let product = get(/databases/$(database)/documents/products/$(productId)).data;
         return product.sellerId == ownerId && (product.status == 'available' || (product.status == 'reserved' && product.get('reservedByRoomId', null) == roomId));
@@ -228,7 +235,7 @@ service cloud.firestore {
             || (tradeStateAfter().acceptedId == tradeState().acceptedId
               && ((request.resource.data.status == 'rejected' && request.auth.uid == resource.data.recipientId)
                 || (request.resource.data.status == 'withdrawn' && request.auth.uid == resource.data.senderId))));
-        allow create: if tradeMember()
+        allow create: if tradeMember() && !isTradeCompleted()
           && request.resource.data.keys().hasAll(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
           && request.resource.data.keys().hasOnly(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
           && request.resource.data.senderId == request.auth.uid
@@ -259,6 +266,64 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'pending'
           && ((getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'accepted' && request.resource.data.acceptedId == resource.data.pendingId)
             || (getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status in ['rejected', 'withdrawn'] && request.resource.data.acceptedId == resource.data.acceptedId));
+      }
+      match /completions/{proposalId} {
+        function members() { return [tradeRoom().requesterId, tradeRoom().sellerId]; }
+        function validList(value) {
+          return value is list && value.size() <= 2 && value.toSet().size() == value.size() && value.hasOnly(members());
+        }
+        function validCompletion() {
+          let data = request.resource.data;
+          return data.keys().hasAll(['confirmedBy', 'deferredBy', 'reviewedBy', 'updatedAt'])
+            && data.keys().hasOnly(['confirmedBy', 'deferredBy', 'reviewedBy', 'updatedAt'])
+            && validList(data.confirmedBy) && validList(data.deferredBy) && validList(data.reviewedBy)
+            && data.updatedAt == request.time;
+        }
+        function completedProduct(productId) {
+          let product = getAfter(/databases/$(database)/documents/products/$(productId)).data;
+          return product.status == 'completed' && product.reservedByRoomId == roomId;
+        }
+        function validResponse() {
+          let before = completionBefore(proposalId);
+          let after = request.resource.data;
+          let proposal = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId)).data;
+          let uid = request.auth.uid;
+          return tradeState().acceptedId == proposalId && tradeState().pendingId == null
+            && proposal.status == 'accepted' && proposal.terms.scheduledAt <= request.time.toMillis()
+            && !(uid in before.confirmedBy) && after.reviewedBy == before.reviewedBy
+            && ((after.confirmedBy == before.confirmedBy.concat([uid]) && after.deferredBy == before.deferredBy.removeAll([uid]))
+              || (after.confirmedBy == before.confirmedBy && after.deferredBy.toSet() == before.deferredBy.toSet().union([uid].toSet())))
+            && (after.confirmedBy.size() < 2 || (completedProduct(proposal.productId)
+              && (proposal.terms.exchangeProductId == null || completedProduct(proposal.terms.exchangeProductId))));
+        }
+        function validReviewSubmission() {
+          let before = resource.data;
+          let after = request.resource.data;
+          let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId)/reviews/$(request.auth.uid);
+          return before.confirmedBy.hasAll(members()) && !(request.auth.uid in before.reviewedBy)
+            && after.confirmedBy == before.confirmedBy && after.deferredBy == before.deferredBy
+            && after.reviewedBy == before.reviewedBy.concat([request.auth.uid])
+            && !exists(path) && getAfter(path).data.createdAt == request.time;
+        }
+        allow read: if tradeMember();
+        allow create, update: if tradeMember() && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && validCompletion() && validResponse();
+        allow update: if tradeMember() && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && validCompletion() && validReviewSubmission();
+
+        match /reviews/{authorId} {
+          function completion() { return completionBefore(proposalId); }
+          allow get: if tradeMember() && (authorId == request.auth.uid || completion().reviewedBy.hasAll(members()));
+          allow create: if tradeMember() && authorId == request.auth.uid
+            && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+            && completion().confirmedBy.hasAll(members())
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId)).data.reviewedBy.hasAll([authorId])
+            && request.resource.data.keys().hasAll(['rating', 'content', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['rating', 'content', 'createdAt'])
+            && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+            && request.resource.data.content is string && request.resource.data.content.size() <= 1000
+            && request.resource.data.content.matches('(?s).*\\S.*') && request.resource.data.createdAt == request.time;
+        }
       }
       match /imageUploads/{messageId} {
         function canUpload() {
@@ -445,6 +510,19 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
+      function isTradeCompletion() {
+        let roomId = resource.data.reservedByRoomId;
+        let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+        let state = get(/databases/$(database)/documents/chatRooms/$(roomId)/trade/state).data;
+        let proposal = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(state.acceptedId)).data;
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(state.acceptedId);
+        return request.auth.uid in [room.requesterId, room.sellerId]
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && resource.data.status == 'reserved' && request.resource.data.status == 'completed'
+          && get(path).data.confirmedBy.size() == 1
+          && getAfter(path).data.confirmedBy.hasAll([room.requesterId, room.sellerId])
+          && (productId == proposal.productId || productId == proposal.terms.exchangeProductId);
+      }
       function isTradeReservation() {
         let roomId = request.resource.data.reservedByRoomId;
         let statePath = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
@@ -542,7 +620,7 @@ service cloud.firestore {
         && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.get('sellerId', '__legacy__')))
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange())
-          || isTradeReservation() || isTradeRelease());
+          || isTradeReservation() || isTradeRelease() || isTradeCompletion());
       allow create: if isActiveUser()
         && isValidProductFields(request.resource.data)
         && request.resource.data.sellerId == request.auth.uid
