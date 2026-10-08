@@ -15,7 +15,9 @@ export default function HeaderAuthActions({
   isLoggedIn,
 }: HeaderAuthActionsProps) {
   const userId = useProfileUserId();
-  const { data: profile } = usePublicProfileQuery(isLoggedIn ? userId : null);
+  const { data: profile, isPending } = usePublicProfileQuery(
+    isLoggedIn ? userId : null,
+  );
   if (!isLoggedIn) {
     return (
       <nav aria-label="회원 메뉴" className="flex items-center gap-3">
@@ -53,6 +55,7 @@ export default function HeaderAuthActions({
           imageUrl={profile?.imageUrl ?? null}
           nickname={profile?.nickname ?? "내"}
           size="compact"
+          isLoading={isPending}
         />
       </Link>
     </div>
