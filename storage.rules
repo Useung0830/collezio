@@ -2,6 +2,20 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    match /profiles/{userId}/{imageId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId
+          && !firestore.exists(/databases/(default)/documents/withdrawalRequests/$(userId));
+      }
+      allow get: if true;
+      allow create: if isOwner() && resource == null && imageId.matches('[a-zA-Z0-9-]+')
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+      allow delete: if isOwner()
+        && (!firestore.exists(/databases/(default)/documents/profiles/$(userId))
+          || firestore.get(/databases/(default)/documents/profiles/$(userId)).data.get('imagePath', '')
+            != 'profiles/' + userId + '/' + imageId);
+    }
     match /chat/{roomId}/{userId}/{messageId} {
       function canRead() {
         let room = firestore.get(/databases/(default)/documents/chatRooms/$(roomId)).data;

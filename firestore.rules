@@ -410,7 +410,24 @@ service cloud.firestore {
     }
 
     match /profiles/{userId} {
+      function isValidProfileImage() {
+        let data = request.resource.data;
+        return data.imagePath is string
+          && data.imagePath.matches('profiles/' + userId + '/[a-zA-Z0-9-]+')
+          && data.imageUrl is string
+          && data.imageUrl.size() <= 2048
+          && data.imageUrl.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[a-zA-Z0-9.-]+/o/'
+            + data.imagePath.replace('/', '%2F') + '[?]alt=media(&token=[a-zA-Z0-9-]+)?');
+      }
       allow get: if true;
+      allow update: if isActiveUser() && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nickname', 'imageUrl', 'imagePath'])
+        && request.resource.data.nickname is string
+        && request.resource.data.nickname.size() >= 2
+        && request.resource.data.nickname.size() <= 10
+        && request.resource.data.nickname.matches('.*[^\\s].*')
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['imageUrl', 'imagePath'])
+          || isValidProfileImage());
       allow create: if isActiveUser()
         && request.auth.uid == userId
         && request.resource.data.keys().hasAll(['nickname', 'imageUrl', 'bio', 'createdAt'])

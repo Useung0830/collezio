@@ -1,9 +1,11 @@
 import Link from "next/link";
 
 import LinkButton from "@/components/common/button/LinkButton";
+import ProfileAvatar from "@/features/user/components/ProfileAvatar";
+import { useProfileUserId } from "@/features/user/hooks/useProfileUserId";
+import { usePublicProfileQuery } from "@/features/user/hooks/usePublicProfileQuery";
 
 import BellIcon from "@/assets/icons/icon-bell-outline.svg";
-import ProfileIcon from "@/assets/icons/icon-profile.svg";
 
 type HeaderAuthActionsProps = {
   isLoggedIn: boolean;
@@ -12,6 +14,8 @@ type HeaderAuthActionsProps = {
 export default function HeaderAuthActions({
   isLoggedIn,
 }: HeaderAuthActionsProps) {
+  const userId = useProfileUserId();
+  const { data: profile } = usePublicProfileQuery(isLoggedIn ? userId : null);
   if (!isLoggedIn) {
     return (
       <nav aria-label="회원 메뉴" className="flex items-center gap-3">
@@ -45,7 +49,11 @@ export default function HeaderAuthActions({
         aria-label="마이페이지"
         className="border-black-100 flex size-8 items-center justify-center rounded-full border"
       >
-        <ProfileIcon className="size-6" aria-hidden="true" />
+        <ProfileAvatar
+          imageUrl={profile?.imageUrl ?? null}
+          nickname={profile?.nickname ?? "내"}
+          size="compact"
+        />
       </Link>
     </div>
   );

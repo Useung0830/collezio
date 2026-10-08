@@ -118,9 +118,17 @@ export async function processDataPage(db, bucket, userId, stage, cursor) {
       for (const file of files) await file.delete({ ignoreNotFound: true });
       return files.length ? "" : null;
     }
-    case "profile":
+    case "profile": {
+      const [files] = await bucket.getFiles({
+        prefix: `profiles/${userId}/`,
+        maxResults: PAGE_SIZE,
+        autoPaginate: false,
+      });
+      for (const file of files) await file.delete({ ignoreNotFound: true });
+      if (files.length) return "";
       await db.doc(`profiles/${userId}`).delete();
       return null;
+    }
     case "user":
       await db.recursiveDelete(db.doc(`users/${userId}`));
       return null;

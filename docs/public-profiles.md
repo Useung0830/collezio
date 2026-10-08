@@ -6,6 +6,7 @@
 
 - `nickname`: 가입 시 Auth의 `displayName`에서 가져오는 닉네임
 - `imageUrl`: 프로필 사진 URL. 최초 생성 시 `null`
+- `imagePath`: 사진 변경 시 저장하는 `profiles/{uid}/{imageId}` Storage 경로
 - `bio`: 자기소개. 최초 생성 시 빈 문자열
 - `createdAt`: 서버 생성 시각
 - `rating`, `tradeCount`: 추후 서버 집계용 선택 필드. 클라이언트 생성·수정 금지
@@ -20,9 +21,11 @@
 
 ## 권한과 범위
 
-`firestore.rules`는 공개 단건 조회와 본인 문서 생성을 허용한다. 목록 조회, 클라이언트 수정·삭제, 임의 필드 추가는 허용하지 않는다. 기존 상품 규칙은 보존한다.
+`firestore.rules`는 공개 단건 조회와 본인 문서 생성 및 닉네임·사진 수정을 허용한다. 목록 조회, 클라이언트 삭제, 집계·생성일·자기소개 변경과 임의 필드 추가는 허용하지 않는다. 탈퇴 처리 중인 계정은 수정·업로드할 수 없다.
 
-이 작업은 조회와 최초 생성을 구현한다. 사진 업로드·프로필 수정 화면·거래 및 리뷰 집계는 별도 기능이다. 서버에서 저장한 프로젝트 Storage 이미지 URL은 표시할 수 있다.
+마이페이지 상단의 수정 버튼에서 닉네임(앞뒤 공백 제거 후 2~10자)과 사진(JPG·PNG·WebP, 5MB 이하)을 변경한다. 저장 전에는 사진 미리보기만 표시하며 취소하면 입력을 버린다. 저장 후 프로필 캐시를 갱신하며 공개 표시의 기준은 Auth의 가입 당시 displayName이 아닌 profiles 문서다. 거래 및 리뷰 집계는 추후 구현한다.
+
+사진은 본인 경로에 새 파일로 업로드한다. 저장 실패 시 새 파일, 교체 성공 시 이전 파일 정리를 시도하며 현재 프로필에서 사용 중인 파일은 삭제·덮어쓰기할 수 없다. 네트워크 오류 등으로 정리하지 못한 파일은 탈퇴 시 프로필 경로와 함께 정리한다.
 
 ## 검증과 배포
 
@@ -32,7 +35,7 @@ npm run build
 node --test tests/unit/*.test.mjs
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore "node --test tests/integration/profiles.rules.test.mjs"
 npm run test:e2e
-npx firebase deploy --project collezio-e3a8d --only firestore:rules
+npx firebase deploy --project collezio-e3a8d --only firestore:rules,storage,functions
 ```
 
-실제 서비스에서 기능을 사용하려면 프로필 규칙 배포가 필요하다. E2E는 Auth와 Firestore 에뮬레이터만 사용한다.
+실제 서비스에서 기능을 사용하려면 Firestore·Storage 규칙과 프로필 이미지 탈퇴 정리를 포함한 Functions 배포가 필요하다. 사진 수정 테스트는 Auth·Firestore·Storage 에뮬레이터를 사용한다.

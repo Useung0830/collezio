@@ -89,6 +89,7 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   });
   await batch.commit();
   await bucket.file(`products/${id}/image`).save("test");
+  await bucket.file(`profiles/${id}/image`).save("profile");
   const services = { db, auth, bucket };
   await assert.rejects(
     processWithdrawal(
@@ -122,6 +123,7 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
     false,
   );
   assert.equal((await bucket.file(`products/${id}/image`).exists())[0], false);
+  assert.equal((await bucket.file(`profiles/${id}/image`).exists())[0], false);
   assert.equal(
     (await room.collection("messages").doc("message").get()).get("content"),
     "보존할 대화",
