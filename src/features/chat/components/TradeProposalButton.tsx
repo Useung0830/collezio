@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createTradeProposal } from "@/features/chat/api/createTradeProposal";
 import TradeProductPicker from "@/features/chat/components/TradeProductPicker";
 import TradeProposalForm from "@/features/chat/components/TradeProposalForm";
+import { useTradeCompletion } from "@/features/chat/hooks/useTradeCompletion";
 import { useTradeProposals } from "@/features/chat/hooks/useTradeProposals";
 import type { ChatRoomView } from "@/features/chat/types/registeredChatRoom";
 import type { TradeTerms } from "@/features/chat/types/tradeProposal";
@@ -29,6 +30,8 @@ export default function TradeProposalButton({
     (item) => item.id === query.data?.state.acceptedId,
   );
   const pending = !!query.data?.state.pendingId;
+  const completion = useTradeCompletion(room.id, userId, accepted?.id ?? null);
+  const isCompleted = completion.data?.confirmedBy.length === 2;
   const handleOpen = async () => {
     setError("");
     setIsLoading(true);
@@ -84,18 +87,22 @@ export default function TradeProposalButton({
           query.isError ||
           isLoading ||
           pending ||
+          isCompleted ||
+          (!!accepted && (completion.isPending || completion.isError)) ||
           (!accepted && userId !== room.requesterId)
         }
         onClick={() => void handleOpen()}
         className="bg-brand-blue rounded-full px-3 py-2 text-white disabled:opacity-50"
       >
-        {pending
-          ? "제안 응답 대기"
-          : accepted
-            ? "조건 변경"
-            : room.transaction?.type === "sale"
-              ? "구매 제안"
-              : "교환 제안"}
+        {isCompleted
+          ? "거래 완료"
+          : pending
+            ? "제안 응답 대기"
+            : accepted
+              ? "조건 변경"
+              : room.transaction?.type === "sale"
+                ? "구매 제안"
+                : "교환 제안"}
       </button>
       {query.isError && (
         <button type="button" onClick={() => void query.refetch()}>
