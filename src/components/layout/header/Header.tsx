@@ -8,6 +8,7 @@ import { firebaseAuth } from "@/lib/firebase";
 
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
+import HeaderActionsSkeleton from "./HeaderActionsSkeleton";
 import HeaderAuthActions from "./HeaderAuthActions";
 import HeaderMobileActions from "./HeaderMobileActions";
 import HeaderSearchBar from "./HeaderSearchBar";
@@ -39,11 +40,17 @@ export default function Header() {
             커뮤니티
           </Link>
         </ul>
-        <div className="shrink-0 max-lg:hidden">
-          {isLoggedIn !== null && <HeaderAuthActions isLoggedIn={isLoggedIn} />}
+        <div className="flex h-10 w-46 shrink-0 items-center justify-end max-lg:hidden">
+          {isLoggedIn === null ? (
+            <HeaderActionsSkeleton />
+          ) : (
+            <HeaderAuthActions isLoggedIn={isLoggedIn} />
+          )}
         </div>
         <div className="ml-auto min-w-0 flex-1 lg:hidden">
-          {isLoggedIn !== null && (
+          {isLoggedIn === null ? (
+            <HeaderActionsSkeleton isMobile />
+          ) : (
             <HeaderMobileActions isLoggedIn={isLoggedIn} />
           )}
         </div>

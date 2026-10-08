@@ -41,6 +41,68 @@ test("기존 계정의 프로필을 생성하고 비로그인 방문자에게 �
     ownProfile.getByText("거래 횟수 미집계", { exact: true }),
   ).toBeVisible();
 
+  const editButton = ownProfile.getByRole("button", { name: "프로필 수정" });
+  await editButton.click();
+  const modal = page.getByRole("dialog", { name: "프로필 수정" });
+  const duplicateName = `중복${randomUUID().slice(0, 8)}`;
+  const duplicateProfile = await request.patch(
+    `http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents/profiles/${randomUUID()}`,
+    {
+      headers: { Authorization: "Bearer owner" },
+      data: { fields: { nickname: { stringValue: duplicateName } } },
+    },
+  );
+  expect(duplicateProfile.ok()).toBeTruthy();
+  await expect(
+    modal.getByRole("button", { name: "저장", exact: true }),
+  ).toBeDisabled();
+  await modal.getByLabel("닉네임").fill(duplicateName);
+  await modal.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(
+    modal.getByText("이미 사용 중인 닉네임입니다.", { exact: true }),
+  ).toBeVisible();
+  await modal.getByLabel("닉네임").fill("취소할이름");
+  await page.keyboard.press("Escape");
+  await expect(modal).not.toBeVisible();
+  await expect(editButton).toBeFocused();
+  await expect(
+    ownProfile.getByText("기존판매자", { exact: true }),
+  ).toBeVisible();
+  await editButton.click();
+  await expect(modal.getByLabel("닉네임")).toHaveValue("기존판매자");
+  await modal.getByLabel("닉네임").fill("변경판매자");
+  await modal
+    .getByLabel("프로필 사진", { exact: true })
+    .setInputFiles("src/assets/images/profile.png");
+  await expect(
+    modal.getByRole("img", { name: "변경판매자 프로필" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/profile-edit-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBeTruthy();
+  await modal.getByRole("button", { name: "저장", exact: true }).click();
+  await expect(modal).not.toBeVisible();
+  await expect(
+    ownProfile.getByText("변경판매자", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    ownProfile.getByRole("img", { name: "변경판매자 프로필" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    ownProfile.getByText("변경판매자", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    ownProfile.getByRole("img", { name: "변경판매자 프로필" }),
+  ).toBeVisible();
+
   const productId = randomUUID();
   const productResponse = await request.patch(
     `http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents/products/${productId}`,
@@ -82,7 +144,7 @@ test("기존 계정의 프로필을 생성하고 비로그인 방문자에게 �
       publicPage.getByRole("heading", { name: "프로필 연결 상품" }),
     ).toBeVisible();
     const seller = publicPage.getByRole("region", { name: "판매자 프로필" });
-    await expect(seller.getByText("기존판매자", { exact: true })).toBeVisible();
+    await expect(seller.getByText("변경판매자", { exact: true })).toBeVisible();
     await publicPage.setViewportSize({ width: 390, height: 844 });
     await expect(seller).toBeVisible();
     expect(

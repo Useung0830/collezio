@@ -127,12 +127,20 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     const { user: seller } = await register(sellerAuth);
     const { user: stranger } = await register(strangerAuth);
     const productId = await newProduct(sellerDb, seller.uid);
-    await setDoc(doc(sellerDb, "profiles", seller.uid), {
-      nickname: "채팅 판매자",
-      imageUrl: null,
-      bio: "",
-      createdAt: serverTimestamp(),
-    });
+    const profileResponse = await fetch(
+      "http://127.0.0.1:5001/demo-collezio/asia-northeast3/saveProfile",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await seller.getIdToken()}`,
+        },
+        body: JSON.stringify({
+          data: { mode: "create", nickname: "채팅 판매자" },
+        }),
+      },
+    );
+    assert.equal(profileResponse.ok, true);
     let roomId;
 
     await t.test(

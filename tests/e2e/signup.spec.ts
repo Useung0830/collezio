@@ -10,9 +10,11 @@ async function fillSignupForm(page: Page, email: string) {
   await page.getByLabel("이메일", { exact: true }).fill(email);
   await page.getByLabel("비밀번호", { exact: true }).fill(TEST_PASSWORD);
   await page.getByLabel("비밀번호 확인", { exact: true }).fill(TEST_PASSWORD);
-  await page.getByLabel("닉네임", { exact: true }).fill("테스트회원");
+  const nickname = `회원${randomUUID().slice(0, 8)}`;
+  await page.getByLabel("닉네임", { exact: true }).fill(nickname);
   await page.locator('input[name="hasAcceptedTerms"]').check();
   await page.locator('input[name="hasAcceptedPrivacy"]').check();
+  return nickname;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -56,7 +58,7 @@ test("가입 성공 시 공개 프로필을 생성하고 로그인으로 이동�
   request,
 }) => {
   const email = `${randomUUID()}@example.com`;
-  await fillSignupForm(page, email);
+  const nickname = await fillSignupForm(page, email);
   await page.getByRole("button", { name: "회원가입", exact: true }).click();
 
   await expect(
@@ -76,7 +78,7 @@ test("가입 성공 시 공개 프로필을 생성하고 로그인으로 이동�
   );
   expect(profile.ok()).toBeTruthy();
   const { fields } = await profile.json();
-  expect(fields.nickname.stringValue).toBe("테스트회원");
+  expect(fields.nickname.stringValue).toBe(nickname);
   expect(fields.email).toBeUndefined();
   expect(fields.rating).toBeUndefined();
 });
@@ -96,4 +98,33 @@ test("이미 가입된 이메일이면 오류를 표시한다", async ({ page, r
     page.getByText("이미 사용 중인 이메일입니다.", { exact: true }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/signup$/);
+});
+
+test("기존 닉네임으로 가입하면 닉네임 오류를 표시하고 계정은 만들지 않는다", async ({
+  page,
+  request,
+}) => {
+  const nickname = `중복${randomUUID().slice(0, 8)}`;
+  const seed = await request.patch(
+    `http://127.0.0.1:8080/v1/projects/demo-collezio/databases/(default)/documents/profiles/${randomUUID()}`,
+    {
+      headers: { Authorization: "Bearer owner" },
+      data: { fields: { nickname: { stringValue: nickname } } },
+    },
+  );
+  expect(seed.ok()).toBeTruthy();
+  const email = `${randomUUID()}@example.com`;
+  await fillSignupForm(page, email);
+  await page.getByLabel("닉네임", { exact: true }).fill(nickname);
+  await page.getByRole("button", { name: "회원가입", exact: true }).click();
+  await expect(
+    page.getByText("이미 사용 중인 닉네임입니다.", { exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/signup$/);
+  // 같은 이메일로 다른 닉네임을 입력하면 가입할 수 있습니다.
+  await page
+    .getByLabel("닉네임", { exact: true })
+    .fill(`변경${randomUUID().slice(0, 8)}`);
+  await page.getByRole("button", { name: "회원가입", exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
 });

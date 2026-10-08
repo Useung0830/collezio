@@ -10,10 +10,37 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 import { parseWithdrawalFeedback } from "./parseWithdrawalFeedback.js";
 import { processWithdrawal } from "./processWithdrawal.js";
+import { isNicknameAvailable } from "./profileNickname.js";
+import { savePublicProfile } from "./savePublicProfile.js";
 
 initializeApp();
 const db = getFirestore();
 const services = () => ({ db, auth: getAuth(), bucket: getStorage().bucket() });
+
+export const checkNickname = onCall(
+  { region: "asia-northeast3" },
+  async (request) => ({
+    available: await isNicknameAvailable(
+      db,
+      request.data?.nickname,
+      request.auth?.uid,
+    ),
+  }),
+);
+
+export const saveProfile = onCall(
+  { region: "asia-northeast3" },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    return savePublicProfile(
+      db,
+      request.auth.uid,
+      request.data,
+      getStorage().bucket().name,
+    );
+  },
+);
 
 export const withdrawAccount = onCall(
   { region: "asia-northeast3", timeoutSeconds: 540 },

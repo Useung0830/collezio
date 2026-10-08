@@ -1,5 +1,7 @@
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 
+import { getNicknameKey } from "./profileNickname.js";
+
 const PAGE_SIZE = 50;
 
 export async function removeCountedDocument(db, reference, parent, countField) {
@@ -118,9 +120,28 @@ export async function processDataPage(db, bucket, userId, stage, cursor) {
       for (const file of files) await file.delete({ ignoreNotFound: true });
       return files.length ? "" : null;
     }
-    case "profile":
-      await db.doc(`profiles/${userId}`).delete();
+    case "profile": {
+      const [files] = await bucket.getFiles({
+        prefix: `profiles/${userId}/`,
+        maxResults: PAGE_SIZE,
+        autoPaginate: false,
+      });
+      for (const file of files) await file.delete({ ignoreNotFound: true });
+      if (files.length) return "";
+      await db.runTransaction(async (transaction) => {
+        const profileRef = db.doc(`profiles/${userId}`);
+        const profile = await transaction.get(profileRef);
+        const nickname = profile.get("nickname");
+        const claimRef =
+          typeof nickname === "string"
+            ? db.doc(`nicknames/${getNicknameKey(nickname)}`)
+            : null;
+        const claim = claimRef ? await transaction.get(claimRef) : null;
+        if (claim?.get("userId") === userId) transaction.delete(claimRef);
+        transaction.delete(profileRef);
+      });
       return null;
+    }
     case "user":
       await db.recursiveDelete(db.doc(`users/${userId}`));
       return null;

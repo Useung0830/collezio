@@ -24,6 +24,7 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
+import { connectFunctionsEmulator } from "firebase/functions";
 
 test("찜 API와 권한 규칙", async (t) => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "에뮬레이터가 필요합니다.");
@@ -50,8 +51,9 @@ test("찜 API와 권한 규칙", async (t) => {
       return nextResolve(specifier, context);
     },
   });
-  const { firebaseApp, firebaseAuth, firebaseDb } =
+  const { firebaseApp, firebaseAuth, firebaseDb, firebaseFunctions } =
     await import("../../src/lib/firebase.ts");
+  connectFunctionsEmulator(firebaseFunctions, "127.0.0.1", 5001);
   const { updateProductFavorite } =
     await import("../../src/features/favorite/api/updateProductFavorite.ts");
   const { getProductFavorite } =

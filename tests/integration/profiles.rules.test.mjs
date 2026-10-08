@@ -15,13 +15,17 @@ import {
   getDoc,
   getDocs,
   getFirestore,
-  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
+import {
+  connectFunctionsEmulator,
+  getFunctions,
+  httpsCallable,
+} from "firebase/functions";
 
-test("프로필 규칙은 공개 단건 조회와 본인 생성을 허용하고 위조·수정·목록 조회를 거부한다", async () => {
+test("프로필 규칙은 공개 단건 조회와 서버 생성을 허용하고 직접 쓰기·목록 조회를 거부한다", async () => {
   assert.ok(
     process.env.FIRESTORE_EMULATOR_HOST,
     "Firestore 에뮬레이터에서만 실행합니다.",
@@ -43,6 +47,8 @@ test("프로필 규칙은 공개 단건 조회와 본인 생성을 허용하고 
   );
   const [host, port] = process.env.FIRESTORE_EMULATOR_HOST.split(":");
   connectFirestoreEmulator(db, host, Number(port));
+  const functions = getFunctions(app, "asia-northeast3");
+  connectFunctionsEmulator(functions, "127.0.0.1", 5001);
   const denied = (error) => error.code === "permission-denied";
   try {
     const { user } = await createUserWithEmailAndPassword(
@@ -69,10 +75,15 @@ test("프로필 규칙은 공개 단건 조회와 본인 생성을 허용하고 
       setDoc(own, { ...data, email: "private@example.com" }),
       denied,
     );
-    await runTransaction(db, async (transaction) => {
-      assert.equal((await transaction.get(own)).exists(), false);
-      transaction.set(own, data);
-    });
+    await assert.rejects(setDoc(own, data), denied);
+    await httpsCallable(
+      functions,
+      "saveProfile",
+    )({ mode: "create", nickname: "판매자" });
+    await assert.rejects(
+      setDoc(doc(db, "nicknames", "forged"), { userId: user.uid }),
+      denied,
+    );
     assert.equal((await getDoc(own)).data().nickname, "판매자");
     await assert.rejects(updateDoc(own, { rating: 5 }), denied);
     await assert.rejects(getDocs(collection(db, "profiles")), denied);
