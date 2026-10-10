@@ -1,14 +1,32 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { getCommunityPostMetadata } from "@/features/community/api/getCommunityPostMetadata";
 import CommunityPostDetail from "@/features/community/components/CommunityPostDetail";
 
 import RightIcon from "@/assets/icons/icon-right.svg";
 
-export const metadata: Metadata = {
+const fallbackMetadata: Metadata = {
   title: "커뮤니티 게시글",
   description: "수집가의 이야기를 읽고 댓글과 좋아요로 소통해보세요.",
 };
+
+export async function generateMetadata(
+  props: PageProps<"/community/[postId]">,
+): Promise<Metadata> {
+  const { postId } = await props.params;
+  try {
+    const post = await getCommunityPostMetadata(postId);
+    if (!post) return { ...fallbackMetadata, robots: { index: false } };
+    return {
+      title: post.title,
+      description: post.description || fallbackMetadata.description,
+    };
+  } catch {
+    // 메타데이터 조회 장애가 기존 상세 화면까지 막지 않도록 기본 문구를 사용합니다.
+    return fallbackMetadata;
+  }
+}
 
 export default async function CommunityPostPage(
   props: PageProps<"/community/[postId]">,
