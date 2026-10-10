@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import CommunityPostDetail from "@/features/community/components/CommunityPostDetail";
 
 import RightIcon from "@/assets/icons/icon-right.svg";
+
+export const metadata: Metadata = {
+  title: "커뮤니티 게시글",
+  description: "수집가의 이야기를 읽고 댓글과 좋아요로 소통해보세요.",
+};
 
 export default async function CommunityPostPage(
   props: PageProps<"/community/[postId]">,

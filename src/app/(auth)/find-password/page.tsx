@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import Button from "@/components/common/button/Button";
 
 import EmailIcon from "@/assets/icons/icon-email.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
+
+export const metadata: Metadata = {
+  title: "비밀번호 찾기",
+  description: "콜레지오 계정의 비밀번호 찾기 페이지입니다.",
+};
 
 export default function FindPasswordPage() {
   return (

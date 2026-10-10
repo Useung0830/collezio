@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
+
 import LinkButton from "@/components/common/button/LinkButton";
 import CommunityListBackButton from "@/features/community/components/CommunityListBackButton";
 import CommunityPostList from "@/features/community/components/CommunityPostList";
+
+export const metadata: Metadata = {
+  title: "커뮤니티",
+  description:
+    "컬렉션과 수집에 관한 이야기를 읽고 다른 수집가들과 정보를 나눠보세요.",
+};
 
 export default function CommunityPage() {
   return (
