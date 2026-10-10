@@ -12,7 +12,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function getPublicFirestoreTextFields({
+function parseValue(value: unknown): unknown {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.stringValue === "string") return value.stringValue;
+  if (isRecord(value.arrayValue)) {
+    return Array.isArray(value.arrayValue.values)
+      ? value.arrayValue.values.map(parseValue)
+      : [];
+  }
+  if (isRecord(value.mapValue) && isRecord(value.mapValue.fields)) {
+    return Object.fromEntries(
+      Object.entries(value.mapValue.fields).map(([key, item]) => [
+        key,
+        parseValue(item),
+      ]),
+    );
+  }
+  return undefined;
+}
+
+export async function getPublicFirestoreFields({
   collection,
   documentId,
   fields,
@@ -58,12 +77,8 @@ export async function getPublicFirestoreTextFields({
     throw new Error("공개 문서 응답을 확인할 수 없습니다.");
   }
 
-  const textFields: Record<string, string> = {};
-  for (const field of fields) {
-    const value = document.fields[field];
-    if (isRecord(value) && typeof value.stringValue === "string") {
-      textFields[field] = value.stringValue;
-    }
-  }
-  return textFields;
+  const documentFields = document.fields;
+  return Object.fromEntries(
+    fields.map((field) => [field, parseValue(documentFields[field])]),
+  );
 }

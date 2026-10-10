@@ -1,5 +1,19 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 상세 페이지 공유 메타데이터
+
+- 상품·게시글 상세는 공개 Firestore 문서에서 제목·본문 요약·대표 이미지를 조회해 Open Graph와 Twitter 카드를 생성합니다. 본문 화면의 데이터 조회는 기존 클라이언트 방식을 유지합니다.
+- `SITE_URL`은 canonical과 공유 URL의 기준 origin입니다. 미설정 시 `https://collezio.vercel.app`을 사용하며, 운영 도메인이 바뀌면 배포 환경변수도 변경해야 합니다. 경로·쿼리·인증 정보가 없는 HTTPS 주소를 사용하고 로컬 테스트만 HTTP를 허용합니다.
+- 공유 이미지는 현재 Storage 버킷과 상품 판매자 또는 게시글 작성자·문서 경로가 일치하는 첫 유효 이미지입니다. 원본 다운로드 URL을 사용하며, 형식이 잘못되었거나 사진이 없으면 기존 서비스 배너인 `/share-default.jpg`를 사용합니다. 메타데이터 요청마다 이미지 파일의 존재 여부를 별도로 조회하지는 않습니다.
+- 문서 미존재·권한 거부는 기본 공유 문구·이미지와 `noindex`로 처리하고, 일시적 조회 장애는 기본 공유 정보로 처리합니다. Firebase 규칙 변경 없이 공개 REST 조회를 사용하며, 실제 공유 앱의 미리보기와 캐시 갱신은 사이트 배포 후 별도로 확인합니다.
+
+```bash
+npm run check
+npm run test:unit
+npm run build
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage "npx playwright test tests/e2e/detail-metadata.spec.ts"
+```
+
 ## 커뮤니티
 
 구현 범위, 데이터 처리, 실패 복구와 로컬 검증 방법은 [커뮤니티 구현 현황](docs/community.md)을 참고하세요.

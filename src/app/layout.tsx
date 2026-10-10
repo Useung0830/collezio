@@ -4,9 +4,12 @@ import Toast from "@/components/common/Toast";
 import QueryProvider from "@/components/QueryProvider";
 import AuthQueryCleanup from "@/features/auth/components/AuthQueryCleanup";
 
+import { getSiteUrl } from "@/lib/getSiteUrl";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: getSiteUrl(),
   title: {
     default: "Collezio — 소중한 컬렉션을 교환으로 연결하다",
     template: "%s | Collezio",
