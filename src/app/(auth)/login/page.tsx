@@ -9,6 +9,7 @@ import KakaoLogoIcon from "@/assets/icons/icon-kakao-logo.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
 export const metadata: Metadata = {
+  robots: { index: false },
   title: "로그인",
   description: "콜레지오에 로그인하고 나의 컬렉션과 교환 대화를 이어가세요.",
 };

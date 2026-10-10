@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+
 import MySidebar from "@/components/layout/my-sidebar/MySidebar";
 import RequireAuth from "@/features/auth/components/RequireAuth";
+
+export const metadata: Metadata = {
+  robots: { index: false },
+};
 
 export default function MyLayout({ children }: { children: React.ReactNode }) {
   return (

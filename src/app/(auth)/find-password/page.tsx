@@ -7,6 +7,7 @@ import EmailIcon from "@/assets/icons/icon-email.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
 export const metadata: Metadata = {
+  robots: { index: false },
   title: "비밀번호 찾기",
   description: "콜레지오 계정의 비밀번호 찾기 페이지입니다.",
 };
