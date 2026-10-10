@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
+
 import ChatListBackButton from "@/features/chat/components/ChatListBackButton";
 import ChatRoomList from "@/features/chat/components/ChatRoomList";
+
+export const metadata: Metadata = {
+  title: "채팅 목록",
+  description: "소장품 교환을 위해 진행 중인 대화를 확인해보세요.",
+};
 
 export default function ChatPage() {
   return (

@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import SignupForm from "@/features/auth/components/SignupForm";
 
 import LogoGnb from "@/assets/images/logo-gnb.svg";
+
+export const metadata: Metadata = {
+  robots: { index: false },
+  title: "회원가입",
+  description:
+    "콜레지오 계정을 만들고 소장품 교환과 수집 이야기 나누기를 시작해보세요.",
+};
 
 export default function SignupPage() {
   return (

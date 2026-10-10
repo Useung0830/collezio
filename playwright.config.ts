@@ -20,6 +20,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 180_000,
     env: {
+      SITE_URL: "http://127.0.0.1:3100",
       NEXT_PUBLIC_USE_FIREBASE_EMULATOR: "true",
       NEXT_PUBLIC_FIREBASE_API_KEY: "demo-api-key",
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "demo-collezio.firebaseapp.com",
