@@ -32,6 +32,15 @@ npx firebase deploy --only functions,firestore:rules,storage --project <project-
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage,functions "npm run test:integration && node tests/resetEmulators.mjs && npx playwright test tests/e2e/product-registration.spec.ts"
 ```
 
+## 기존 상품 이미지 압축 비교
+
+`node scripts/migrateProductImages.mjs --dry-run`은 운영 `collezio-e3a8d` 상품에 연결된 이미지를 읽어 현재 업로드와 같은 압축 함수로 비교합니다. Firebase CLI 로그인과 운영 읽기 권한이 필요합니다. `--apply`는 원본을 보존하고 압축본만 새 경로에 저장하며 상품 문서를 변경하지 않습니다.
+
+- 결과는 `.local-review/image-migration/{실행ID}/report.json`과 `report.csv`에 기록합니다. 원본·대상 경로, 원본 객체 세대, SHA-256, 처리 전후 용량·해상도·형식, 절감률, 실패·건너뜀 사유를 포함합니다. 보고서는 Git에 포함하지 않습니다.
+- 이미 압축 버전 1인 이미지, 5MiB 초과 파일, 절감되지 않는 파일은 건너뜁니다. 현재 압축 함수의 정지 이미지·픽셀 제한도 그대로 적용합니다.
+- 저장 경로는 원본 경로와 객체 세대로 결정하며 기존 압축본을 덮어쓰지 않습니다. 저장 후 다시 다운로드해 해시를 검증합니다. 중단 후 재실행하면 일치하는 압축본을 재사용합니다.
+- 상품 연결 변경과 원본 삭제는 수행하지 않습니다. 따라서 보고서의 절감량은 교체 시 예상치이며, 비교본을 보존하는 동안 실제 Storage 사용량은 증가합니다.
+
 ## 커뮤니티
 
 구현 범위, 데이터 처리, 실패 복구와 로컬 검증 방법은 [커뮤니티 구현 현황](docs/community.md)을 참고하세요.
