@@ -17,6 +17,7 @@ const stages = [
   "communityImages",
   "profile",
   "user",
+  "productRegistrations",
 ];
 const LEASE_MS = 600_000;
 const WORK_MS = 360_000;

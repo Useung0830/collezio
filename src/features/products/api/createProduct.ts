@@ -1,56 +1,28 @@
 import {
-  collection,
-  doc,
-  runTransaction,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import type { CreateProductInput } from "@/features/products/types/product";
+  acknowledgeProductRegistration,
+  callRegistration,
+  forgetRegistration,
+  registrationUserId,
+} from "@/features/products/api/productRegistration";
 import { createPublicProfile } from "@/features/user/api/createPublicProfile";
 
-import { firebaseAuth, firebaseDb } from "@/lib/firebase";
+import { firebaseAuth } from "@/lib/firebase";
 
-export async function createProduct(
-  { title, description, transaction, delivery, images }: CreateProductInput,
-  expectedUserId: string,
-  productId = doc(collection(firebaseDb, "products")).id,
-) {
-  await firebaseAuth.authStateReady();
-  const user = firebaseAuth.currentUser;
-
-  if (!user) {
-    throw new Error("로그인 후 상품을 등록해주세요.");
-  }
-  if (user.uid !== expectedUserId) {
+export async function createProduct(registrationId: string) {
+  const userId = await registrationUserId();
+  await createPublicProfile(userId);
+  if (firebaseAuth.currentUser?.uid !== userId)
     throw new Error("로그인 상태가 변경되었습니다.");
+  const { productId } = await callRegistration<{ productId: string }>(
+    "completeProductRegistration",
+    { registrationId },
+  );
+  // An acknowledgement failure must not turn a confirmed product into a failed save.
+  try {
+    await acknowledgeProductRegistration(registrationId);
+  } catch {
+    /* The next visit can confirm the committed record. */
   }
-
-  await createPublicProfile(user.uid);
-  if (firebaseAuth.currentUser?.uid !== user.uid) {
-    throw new Error("로그인 상태가 변경되었습니다.");
-  }
-  const productRef = doc(firebaseDb, "products", productId);
-  await runTransaction(firebaseDb, async (transactionRef) => {
-    const existing = await transactionRef.get(productRef);
-    if (existing.exists()) {
-      if (existing.data().sellerId !== user.uid)
-        throw new Error("상품 등록 결과를 확인할 수 없습니다.");
-      return;
-    }
-    if (firebaseAuth.currentUser?.uid !== user.uid)
-      throw new Error("로그인 상태가 변경되었습니다.");
-    transactionRef.set(productRef, {
-      title: title.trim(),
-      description: description.trim(),
-      transaction,
-      delivery,
-      images,
-      sellerId: user.uid,
-      status: "available",
-      favoriteCount: 0,
-      createdAt: serverTimestamp(),
-    });
-  });
-
-  return productRef.id;
+  forgetRegistration(userId, registrationId);
+  return productId;
 }

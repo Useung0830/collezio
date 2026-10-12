@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -43,7 +43,11 @@ test("상품 업로드는 인증·압축·메타데이터 기록을 거치고 �
       import.meta.url,
     ),
   );
+  const registrationId = randomUUID();
+  const imageId = randomUUID();
   const payload = {
+    registrationId,
+    imageId,
     base64: input.toString("base64"),
     contentType: "image/png",
   };
@@ -60,6 +64,37 @@ test("상품 업로드는 인증·압축·메타데이터 기록을 거치고 �
       },
     );
   try {
+    const begin = await fetch(
+      "http://127.0.0.1:5001/demo-collezio/asia-northeast3/beginProductRegistration",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + idToken,
+        },
+        body: JSON.stringify({
+          data: {
+            registrationId,
+            product: {
+              title: "압축",
+              description: "테스트",
+              transaction: { type: "sale", price: 100 },
+              delivery: { type: "parcel", shippingFee: 0 },
+            },
+            files: [
+              {
+                id: imageId,
+                name: "figure.png",
+                contentType: "image/png",
+                size: input.length,
+                sha256: createHash("sha256").update(input).digest("hex"),
+              },
+            ],
+          },
+        }),
+      },
+    );
+    assert.equal(begin.status, 200, await begin.clone().text());
     assert.equal((await call(payload, null)).status, 401);
     for (const data of [
       { ...payload, userId: "another-user" },
@@ -113,6 +148,11 @@ test("상품 업로드는 인증·압축·메타데이터 기록을 거치고 �
       },
     );
     assert.equal(directUpload.status, 403);
+    const directDelete = await fetch(
+      `http://127.0.0.1:9199/v0/b/${bucketName}/o/${encodeURIComponent(result.path)}`,
+      { method: "DELETE", headers: { Authorization: `Bearer ${idToken}` } },
+    );
+    assert.equal(directDelete.status, 403);
     await db.doc(`withdrawalRequests/${userId}`).set({ status: "processing" });
     assert.equal((await call(payload)).status, 403);
     assert.equal(
@@ -122,6 +162,8 @@ test("상품 업로드는 인증·압축·메타데이터 기록을 거치고 �
   } finally {
     await bucket.deleteFiles({ prefix: `products/${userId}/` });
     await db.doc(`withdrawalRequests/${userId}`).delete();
+    await db.doc("productRegistrations/" + registrationId).delete();
+    await db.doc("productRegistrationOwners/" + userId).delete();
     await auth.deleteUser(userId);
     await deleteApp(app);
   }

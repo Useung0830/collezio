@@ -86,7 +86,8 @@ service firebase.storage {
       // Product images are validated and compressed by the upload function.
       allow create: if false;
 
-      allow delete: if isOwner();
+      // Only the server can delete tracked product uploads.
+      allow delete: if false;
     }
   }
 }

@@ -98,7 +98,7 @@ test("상품 등록은 사진을 압축해 저장하고 손상 사진의 오류�
       "사진을 읽을 수 없습니다. 손상 여부와 해상도를 확인해주세요.",
       { exact: true },
     ),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/products\/new$/);
   await expect(page.getByLabel("제목", { exact: true })).toHaveValue(title);
   await expect.poll(() => uploadedPaths.length).toBe(1);
@@ -156,4 +156,107 @@ test("상품 등록은 사진을 압축해 저장하고 손상 사진의 오류�
     `${documentsUrl}/products/${product.name.split("/").pop()}`,
     { headers: { Authorization: "Bearer owner" } },
   );
+});
+
+test("업로드 응답 유실 후 창을 다시 열면 서버 기록으로 등록을 이어간다", async ({
+  page,
+  context,
+  request,
+}) => {
+  test.setTimeout(60_000);
+  const email = randomUUID() + "@example.com",
+    password = "Test1234!";
+  const signup = await request.post(
+    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key",
+    { data: { email, password, returnSecureToken: true } },
+  );
+  const { localId: userId, idToken } = await signup.json();
+  const nickname = "복구" + randomUUID().slice(0, 6);
+  await request.post(
+    "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:update?key=demo-api-key",
+    { data: { idToken, displayName: nickname, returnSecureToken: true } },
+  );
+  const call = (name: string, data: unknown) =>
+    request.post(
+      "http://127.0.0.1:5001/demo-collezio/asia-northeast3/" + name,
+      { headers: { Authorization: "Bearer " + idToken }, data: { data } },
+    );
+  const registrationId = randomUUID(),
+    imageId = randomUUID();
+  const image = await readFile("src/assets/images/product-luffy-cutout.png");
+  const { createHash } = await import("node:crypto");
+  const begin = await call("beginProductRegistration", {
+    registrationId,
+    product: {
+      title: "응답 유실 복구",
+      description: "서버 기록 복원",
+      transaction: { type: "sale", price: 1000 },
+      delivery: { type: "parcel", shippingFee: 0 },
+    },
+    files: [
+      {
+        id: imageId,
+        name: "figure.png",
+        size: image.length,
+        contentType: "image/png",
+        sha256: createHash("sha256").update(image).digest("hex"),
+      },
+    ],
+  });
+  expect(begin.ok()).toBeTruthy();
+  // The browser never receives or saves this upload response.
+  const uploaded = await call("uploadProductImage", {
+    registrationId,
+    imageId,
+    base64: image.toString("base64"),
+    contentType: "image/png",
+  });
+  expect(uploaded.ok()).toBeTruthy();
+  await page.goto("/login");
+  await page.getByLabel("이메일", { exact: true }).fill(email);
+  await page.getByLabel("비밀번호", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "로그인", exact: true }).click();
+  await expect(page).toHaveURL("http://127.0.0.1:3100/");
+  await page.close();
+  const reopened = await context.newPage();
+  let uploadRequests = 0;
+  reopened.on("request", (request) => {
+    if (request.url().endsWith("/uploadProductImage")) uploadRequests++;
+  });
+  await reopened.route("**/_next/image?**", async (route) => {
+    const source = new URL(
+      new URL(route.request().url()).searchParams.get("url") ?? "",
+      "http://127.0.0.1:3100",
+    );
+    if (source.hostname !== "firebasestorage.googleapis.com")
+      return route.continue();
+    const response = await request.get(
+      "http://127.0.0.1:9199" + source.pathname + source.search,
+    );
+    await route.fulfill({ response });
+  });
+  await reopened.goto("/products/new");
+  await expect(
+    reopened.getByRole("region", { name: "이전 상품 등록" }),
+  ).toBeVisible();
+  await expect(
+    reopened.getByText("사진 1/1장 저장 완료.", { exact: false }),
+  ).toBeVisible();
+  await reopened
+    .getByRole("button", { name: "등록 이어서 진행", exact: true })
+    .click();
+  await expect(reopened).toHaveURL(
+    "http://127.0.0.1:3100/products/" + registrationId,
+    { timeout: 30_000 },
+  );
+  expect(uploadRequests).toBe(0);
+  const document = await request.get(
+    documentsUrl + "/products/" + registrationId,
+    { headers: { Authorization: "Bearer owner" } },
+  );
+  expect(document.ok()).toBeTruthy();
+  expect((await document.json()).fields.sellerId.stringValue).toBe(userId);
+  const repeat = await call("completeProductRegistration", { registrationId });
+  expect((await repeat.json()).result.productId).toBe(registrationId);
+  await reopened.close();
 });

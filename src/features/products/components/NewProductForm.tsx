@@ -9,16 +9,17 @@ import IconButton from "@/components/common/button/IconButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
+import { useProductRegistrationQuery } from "@/features/products/hooks/useProductRegistrationQuery";
 import { useRegisterProductMutation } from "@/features/products/hooks/useRegisterProductMutation";
 import type {
   ProductDelivery,
   ProductTransaction,
 } from "@/features/products/types/product";
-import type { RegisterProductInput } from "@/features/products/utils/createProductRegistration";
-import { ProductRegistrationError } from "@/features/products/utils/productRegistrationError";
+import type { RegisterProductInput } from "@/features/products/types/productRegistration";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 
+import ProductRegistrationRecovery from "./ProductRegistrationRecovery";
 import TradeLocationField from "./TradeLocationField";
 
 type TransactionType = "exchange" | "sale";
@@ -28,6 +29,7 @@ export default function NewProductForm() {
   const router = useRouter();
 
   const registerProductMutation = useRegisterProductMutation();
+  const recoveryQuery = useProductRegistrationQuery();
 
   const [transactionType, setTransactionType] =
     useState<TransactionType>("exchange");
@@ -40,13 +42,12 @@ export default function NewProductForm() {
     detail: "",
   });
 
-  const isAwaitingConfirmation =
-    registerProductMutation.error instanceof ProductRegistrationError &&
-    registerProductMutation.error.isAwaitingConfirmation;
   const isFormLocked =
     registerProductMutation.isPending ||
     registerProductMutation.isSuccess ||
-    isAwaitingConfirmation;
+    recoveryQuery.isChecking ||
+    recoveryQuery.isError ||
+    Boolean(recoveryQuery.data);
 
   const handleRegister = (input: RegisterProductInput) => {
     registerProductMutation.mutate(input, {
@@ -78,10 +79,7 @@ export default function NewProductForm() {
       return;
     }
 
-    if (isAwaitingConfirmation && registerProductMutation.variables) {
-      handleRegister(registerProductMutation.variables);
-      return;
-    }
+    if (isFormLocked) return;
 
     const formData = new FormData(event.currentTarget);
     const title = String(formData.get("title") ?? "").trim();
@@ -158,6 +156,28 @@ export default function NewProductForm() {
         <h1 className="text-heading-24 text-black-900">상품 등록</h1>
       </div>
 
+      {recoveryQuery.isChecking && (
+        <p role="status" className="text-body-16 text-black-900">
+          이전 등록 작업을 확인하고 있습니다.
+        </p>
+      )}
+      {recoveryQuery.isError && (
+        <div className="text-body-16 text-black-900">
+          <p role="alert">
+            이전 등록 상태를 확인하지 못했습니다. 연결 상태를 확인해주세요.
+          </p>
+          <Button type="button" onClick={() => void recoveryQuery.refetch()}>
+            다시 확인
+          </Button>
+        </div>
+      )}
+      {recoveryQuery.data && (
+        <ProductRegistrationRecovery
+          key={recoveryQuery.data.id}
+          registration={recoveryQuery.data}
+          onRefresh={() => void recoveryQuery.refetch()}
+        />
+      )}
       <form className="flex flex-col gap-7" onSubmit={handleSubmit}>
         <fieldset
           disabled={isFormLocked}
@@ -290,19 +310,12 @@ export default function NewProductForm() {
             )}
           </fieldset>
         </fieldset>
-        {isAwaitingConfirmation && (
-          <p role="status" className="text-body-16 text-black-900">
-            등록 결과를 확인하고 있습니다. 이 화면을 유지하고 연결을 복구한 뒤
-            등록 확인을 눌러주세요.
-          </p>
-        )}
         <Button
           type="submit"
           shape="rounded"
           className="h-13"
           disabled={
-            registerProductMutation.isPending ||
-            registerProductMutation.isSuccess ||
+            isFormLocked ||
             files.length === 0 ||
             (isDirect && !tradeLocation.address)
           }
@@ -311,11 +324,9 @@ export default function NewProductForm() {
             ? "등록 중..."
             : registerProductMutation.isSuccess
               ? "등록 완료"
-              : isAwaitingConfirmation
-                ? "등록 확인"
-                : isExchange
-                  ? "교환하기"
-                  : "판매하기"}
+              : isExchange
+                ? "교환하기"
+                : "판매하기"}
         </Button>
       </form>
     </section>

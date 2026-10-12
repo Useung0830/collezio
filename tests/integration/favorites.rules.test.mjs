@@ -26,6 +26,8 @@ import {
 } from "firebase/firestore";
 import { connectFunctionsEmulator } from "firebase/functions";
 
+import { seedProduct } from "./helpers/seedProduct.mjs";
+
 test("찜 API와 권한 규칙", async (t) => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST, "에뮬레이터가 필요합니다.");
   assert.ok(
@@ -60,8 +62,6 @@ test("찜 API와 권한 규칙", async (t) => {
     await import("../../src/features/favorite/api/getProductFavorite.ts");
   const { getFavoriteProducts } =
     await import("../../src/features/favorite/api/getFavoriteProducts.ts");
-  const { createProduct } =
-    await import("../../src/features/products/api/createProduct.ts");
 
   const secondApp = initializeApp(
     { projectId: "demo-collezio", apiKey: "demo-key" },
@@ -102,33 +102,33 @@ test("찜 API와 권한 규칙", async (t) => {
       "Test-password-123!",
     );
     await updateProfile(user, { displayName: "찜 테스트 사용자" });
-    const productId = await createProduct(input, user.uid);
+    const productId = await seedProduct(input, user.uid);
     await t.test(
-      "같은 등록 ID로 재시도해도 기존 상품을 덮어쓰지 않는다",
+      "브라우저의 상품 생성과 등록 작업 기록 접근을 거부한다",
       async () => {
-        assert.equal(
-          await createProduct(
-            { ...input, title: "덮어쓰기 시도" },
-            user.uid,
-            productId,
-          ),
+        await assert.rejects(
+          setDoc(doc(collection(firebaseDb, "products")), {
+            ...input,
+            sellerId: user.uid,
+            status: "available",
+            favoriteCount: 0,
+            createdAt: serverTimestamp(),
+          }),
+          denied,
+        );
+        const registrationRef = doc(
+          firebaseDb,
+          "productRegistrations",
           productId,
         );
-        assert.equal(
-          (
-            await getDocFromServer(doc(firebaseDb, "products", productId))
-          ).data().title,
-          input.title,
+        await assert.rejects(
+          setDoc(registrationRef, { userId: user.uid, status: "committed" }),
+          denied,
         );
-        const concurrentId = doc(collection(firebaseDb, "products")).id;
-        const ids = await Promise.all([
-          createProduct(input, user.uid, concurrentId),
-          createProduct(input, user.uid, concurrentId),
-        ]);
-        assert.deepEqual(ids, [concurrentId, concurrentId]);
+        await assert.rejects(getDocFromServer(registrationRef), denied);
       },
     );
-    const fullGalleryId = await createProduct(
+    const fullGalleryId = await seedProduct(
       {
         ...input,
         images: Array.from({ length: 10 }, () => input.images[0]),
@@ -190,12 +190,7 @@ test("찜 API와 권한 규칙", async (t) => {
       "카운트가 없는 기존 상품도 첫 찜과 취소를 지원한다",
       async () => {
         const legacyRef = doc(collection(firebaseDb, "products"));
-        await setDoc(legacyRef, {
-          ...input,
-          sellerId: user.uid,
-          status: "available",
-          createdAt: serverTimestamp(),
-        });
+        await seedProduct(input, user.uid, legacyRef.id, false);
         for (const isFavorite of [true, false]) {
           await updateProductFavorite({
             productId: legacyRef.id,
@@ -360,7 +355,7 @@ test("찜 API와 권한 규칙", async (t) => {
         assert.deepEqual(await getFavoriteProducts(user.uid), []);
         const productIds = [];
         for (let index = 0; index < 31; index += 1) {
-          const id = await createProduct(
+          const id = await seedProduct(
             {
               ...input,
               title: `목록 상품 ${index}`,

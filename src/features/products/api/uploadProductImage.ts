@@ -1,4 +1,3 @@
-import { FirebaseError } from "firebase/app";
 import { httpsCallable } from "firebase/functions";
 
 import type { ProductImage } from "@/features/products/types/product";
@@ -51,7 +50,11 @@ function parseUploadedImage(data: unknown, userId: string): ProductImage {
   return { path: data.path, url: data.url };
 }
 
-export async function uploadProductImage(file: File): Promise<ProductImage> {
+export async function uploadProductImage(
+  file: File,
+  registrationId: string,
+  imageId: string,
+): Promise<ProductImage> {
   await firebaseAuth.authStateReady();
   const user = firebaseAuth.currentUser;
 
@@ -72,31 +75,21 @@ export async function uploadProductImage(file: File): Promise<ProductImage> {
     throw new Error("로그인 상태가 변경되었습니다.");
   }
   const upload = httpsCallable<
-    { base64: string; contentType: string },
+    {
+      base64: string;
+      contentType: string;
+      registrationId: string;
+      imageId: string;
+    },
     unknown
   >(firebaseFunctions, "uploadProductImage", { timeout: 120_000 });
-  try {
-    const { data } = await upload({ base64, contentType: file.type });
-    if (firebaseAuth.currentUser?.uid !== user.uid) {
-      throw new Error("로그인 상태가 변경되었습니다.");
-    }
-    return parseUploadedImage(data, user.uid);
-  } catch (error) {
-    if (error instanceof FirebaseError) {
-      if (
-        [
-          "functions/invalid-argument",
-          "functions/failed-precondition",
-          "functions/permission-denied",
-          "functions/unauthenticated",
-        ].includes(error.code)
-      ) {
-        throw new Error(error.message.replace(/\s+\[\d{3}\]$/, ""));
-      }
-      throw new Error(
-        "사진 저장에 실패했습니다. 연결 상태를 확인하고 다시 시도해주세요.",
-      );
-    }
-    throw error;
-  }
+  const { data } = await upload({
+    base64,
+    contentType: file.type,
+    registrationId,
+    imageId,
+  });
+  if (firebaseAuth.currentUser?.uid !== user.uid)
+    throw new Error("로그인 상태가 변경되었습니다.");
+  return parseUploadedImage(data, user.uid);
 }

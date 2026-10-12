@@ -612,15 +612,8 @@ service cloud.firestore {
         && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
           || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange())
           || isTradeReservation() || isTradeRelease() || isTradeCompletion());
-      allow create: if isActiveUser()
-        && isValidProductFields(request.resource.data)
-        && request.resource.data.sellerId == request.auth.uid
-        && request.resource.data.status == 'available'
-        && request.resource.data.createdAt == request.time
-        && isValidProductText(request.resource.data)
-        && isValidTransaction(request.resource.data.transaction)
-        && isValidDelivery(request.resource.data.delivery)
-        && isValidImages(request.resource.data.images);
+      // Product creation is atomic with the server registration record.
+      allow create: if false;
     }
   }
 }
