@@ -14,6 +14,20 @@ npm run build
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage "npx playwright test tests/e2e/detail-metadata.spec.ts"
 ```
 
+## 상품 이미지 업로드
+
+- 상품 등록 시 사진을 한 장씩 `uploadProductImage` Callable Function으로 전송합니다. Firebase 인증을 확인하고 서버에서 압축한 뒤 `products/{사용자ID}/{UUID}`에 저장합니다. Storage 규칙은 브라우저의 상품 이미지 직접 생성을 차단하며 기존 이미지 조회는 유지합니다.
+- 입력은 JPEG·PNG·WebP 정지 이미지, 장당 5MiB·4천만 픽셀 이하입니다. Base64 전송으로 요청 크기는 파일보다 약 1/3 커지지만 한 번에 한 장만 전송합니다. 파일 크기 감소는 저장·조회 단계에 적용되며 업로드 데이터 자체를 줄이지는 않습니다.
+- 리사이즈 없이 WebP 품질 90으로 변환하고 방향 보정·메타데이터 제거를 적용합니다. 회전 시 가로·세로는 교환될 수 있습니다. WebP가 더 크면 원래 형식으로도 변환해 비교하며, 모든 결과가 원본보다 크면 오류를 반환합니다.
+- 실제 너비·높이·원본/저장 용량과 압축 버전은 Storage 사용자 메타데이터에 기록합니다. Firestore 상품의 이미지 구조는 기존 `{ url, path }`를 유지합니다. 기존 사진·설명 수정으로 재압축하지 않으며 신규 업로드에만 적용합니다.
+- 함수는 `asia-northeast3`, 메모리 1GiB, 동시 처리 2건, 최대 인스턴스 10개, 제한 시간 120초로 구성합니다. 탈퇴 접수·비활성 계정은 거부하고 저장 중 탈퇴가 시작된 경우 파일을 제거합니다.
+- 운영 적용 순서: `functions` 의존성 설치 → `npx firebase deploy --only functions:uploadProductImage --project <project-id>` → 앱 배포 → `npx firebase deploy --only storage --project <project-id>`. 규칙 적용 이후에는 이전 앱의 직접 업로드가 실패하므로 열린 등록 화면은 새로고침해야 합니다. 로컬 검증은 운영 배포를 수행하지 않습니다.
+- 등록 중 연결 종료·상품 DB 저장 실패로 남은 이미지의 자동 정리와 재시도 시 파일 재사용은 후속 단계입니다.
+
+```bash
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage,functions "node --test functions/tests/product-image*.test.mjs && npx playwright test tests/e2e/product-registration.spec.ts"
+```
+
 ## 커뮤니티
 
 구현 범위, 데이터 처리, 실패 복구와 로컬 검증 방법은 [커뮤니티 구현 현황](docs/community.md)을 참고하세요.

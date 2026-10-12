@@ -11,11 +11,24 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { parseWithdrawalFeedback } from "./parseWithdrawalFeedback.js";
 import { processWithdrawal } from "./processWithdrawal.js";
 import { isNicknameAvailable } from "./profileNickname.js";
+import { saveProductImage } from "./saveProductImage.js";
 import { savePublicProfile } from "./savePublicProfile.js";
 
 initializeApp();
 const db = getFirestore();
 const services = () => ({ db, auth: getAuth(), bucket: getStorage().bucket() });
+
+export const uploadProductImage = onCall(
+  {
+    region: "asia-northeast3",
+    memory: "1GiB",
+    concurrency: 2,
+    maxInstances: 10,
+    timeoutSeconds: 120,
+  },
+  async (request) =>
+    saveProductImage(services(), request.auth?.uid, request.data),
+);
 
 export const checkNickname = onCall(
   { region: "asia-northeast3" },

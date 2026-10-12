@@ -5,18 +5,18 @@ import { createPublicProfile } from "@/features/user/api/createPublicProfile";
 
 import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 
-export async function createProduct({
-  title,
-  description,
-  transaction,
-  delivery,
-  images,
-}: CreateProductInput) {
+export async function createProduct(
+  { title, description, transaction, delivery, images }: CreateProductInput,
+  expectedUserId: string,
+) {
   await firebaseAuth.authStateReady();
   const user = firebaseAuth.currentUser;
 
   if (!user) {
     throw new Error("로그인 후 상품을 등록해주세요.");
+  }
+  if (user.uid !== expectedUserId) {
+    throw new Error("로그인 상태가 변경되었습니다.");
   }
 
   await createPublicProfile(user.uid);

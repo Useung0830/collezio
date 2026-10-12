@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { toast } from "react-toastify/unstyled";
 import { useRouter } from "next/navigation";
+import { FirebaseError } from "firebase/app";
 
 import Button from "@/components/common/button/Button";
 import IconButton from "@/components/common/button/IconButton";
@@ -118,9 +119,11 @@ export default function NewProductForm() {
           toast.success("상품이 등록되었습니다.");
           router.replace("/collections");
         },
-        onError: () => {
+        onError: (error) => {
           toast.error(
-            "상품 등록에 실패했습니다. 입력값과 연결 상태를 확인해주세요.",
+            error instanceof FirebaseError
+              ? "상품 등록에 실패했습니다. 입력값과 연결 상태를 확인해주세요."
+              : error.message,
           );
         },
       },
@@ -144,6 +147,11 @@ export default function NewProductForm() {
           maxImageCount={10}
           showRepresentativeLabel
           onFilesChange={setFiles}
+          accept="image/jpeg,image/png,image/webp"
+          disabled={
+            registerProductMutation.isPending ||
+            registerProductMutation.isSuccess
+          }
         />
 
         <label className="text-label-16 text-black-900 flex flex-col gap-3">

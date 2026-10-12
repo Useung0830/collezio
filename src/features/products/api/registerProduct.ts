@@ -5,6 +5,8 @@ import type {
   ProductImage,
 } from "@/features/products/types/product";
 
+import { firebaseAuth } from "@/lib/firebase";
+
 type RegisterProductInput = Omit<CreateProductInput, "images"> & {
   files: File[];
 };
@@ -18,14 +20,23 @@ export async function registerProduct({
   }
 
   const images: ProductImage[] = [];
+  await firebaseAuth.authStateReady();
+  const userId = firebaseAuth.currentUser?.uid;
+  if (!userId) throw new Error("로그인 후 상품을 등록해주세요.");
 
   for (const file of files) {
+    if (firebaseAuth.currentUser?.uid !== userId) {
+      throw new Error("로그인 상태가 변경되었습니다.");
+    }
     const image = await uploadProductImage(file);
     images.push(image);
   }
 
-  return createProduct({
-    ...product,
-    images,
-  });
+  return createProduct(
+    {
+      ...product,
+      images,
+    },
+    userId,
+  );
 }

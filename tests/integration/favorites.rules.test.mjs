@@ -102,11 +102,14 @@ test("찜 API와 권한 규칙", async (t) => {
       "Test-password-123!",
     );
     await updateProfile(user, { displayName: "찜 테스트 사용자" });
-    const productId = await createProduct(input);
-    const fullGalleryId = await createProduct({
-      ...input,
-      images: Array.from({ length: 10 }, () => input.images[0]),
-    });
+    const productId = await createProduct(input, user.uid);
+    const fullGalleryId = await createProduct(
+      {
+        ...input,
+        images: Array.from({ length: 10 }, () => input.images[0]),
+      },
+      user.uid,
+    );
     assert.equal(
       (
         await getDocFromServer(doc(firebaseDb, "products", fullGalleryId))
@@ -332,10 +335,13 @@ test("찜 API와 권한 규칙", async (t) => {
         assert.deepEqual(await getFavoriteProducts(user.uid), []);
         const productIds = [];
         for (let index = 0; index < 31; index += 1) {
-          const id = await createProduct({
-            ...input,
-            title: `목록 상품 ${index}`,
-          });
+          const id = await createProduct(
+            {
+              ...input,
+              title: `목록 상품 ${index}`,
+            },
+            user.uid,
+          );
           await updateProductFavorite({
             productId: id,
             userId: user.uid,
