@@ -103,6 +103,31 @@ test("찜 API와 권한 규칙", async (t) => {
     );
     await updateProfile(user, { displayName: "찜 테스트 사용자" });
     const productId = await createProduct(input, user.uid);
+    await t.test(
+      "같은 등록 ID로 재시도해도 기존 상품을 덮어쓰지 않는다",
+      async () => {
+        assert.equal(
+          await createProduct(
+            { ...input, title: "덮어쓰기 시도" },
+            user.uid,
+            productId,
+          ),
+          productId,
+        );
+        assert.equal(
+          (
+            await getDocFromServer(doc(firebaseDb, "products", productId))
+          ).data().title,
+          input.title,
+        );
+        const concurrentId = doc(collection(firebaseDb, "products")).id;
+        const ids = await Promise.all([
+          createProduct(input, user.uid, concurrentId),
+          createProduct(input, user.uid, concurrentId),
+        ]);
+        assert.deepEqual(ids, [concurrentId, concurrentId]);
+      },
+    );
     const fullGalleryId = await createProduct(
       {
         ...input,

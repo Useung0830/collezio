@@ -1,42 +1,29 @@
+import { FirebaseError } from "firebase/app";
+import { collection, doc } from "firebase/firestore";
+
 import { createProduct } from "@/features/products/api/createProduct";
+import { deleteProductImages } from "@/features/products/api/deleteProductImages";
 import { uploadProductImage } from "@/features/products/api/uploadProductImage";
-import type {
-  CreateProductInput,
-  ProductImage,
-} from "@/features/products/types/product";
+import { createProductRegistration } from "@/features/products/utils/createProductRegistration";
 
-import { firebaseAuth } from "@/lib/firebase";
+import { firebaseAuth, firebaseDb } from "@/lib/firebase";
 
-type RegisterProductInput = Omit<CreateProductInput, "images"> & {
-  files: File[];
-};
-
-export async function registerProduct({
-  files,
-  ...product
-}: RegisterProductInput) {
-  if (files.length === 0 || files.length > 10) {
-    throw new Error("사진은 1장 이상, 10장 이하로 등록해주세요.");
-  }
-
-  const images: ProductImage[] = [];
-  await firebaseAuth.authStateReady();
-  const userId = firebaseAuth.currentUser?.uid;
-  if (!userId) throw new Error("로그인 후 상품을 등록해주세요.");
-
-  for (const file of files) {
-    if (firebaseAuth.currentUser?.uid !== userId) {
-      throw new Error("로그인 상태가 변경되었습니다.");
-    }
-    const image = await uploadProductImage(file);
-    images.push(image);
-  }
-
-  return createProduct(
-    {
-      ...product,
-      images,
+export function createRegisterProduct() {
+  return createProductRegistration({
+    getUserId: async () => {
+      await firebaseAuth.authStateReady();
+      const userId = firebaseAuth.currentUser?.uid;
+      if (!userId) throw new Error("로그인 후 상품을 등록해주세요.");
+      return userId;
     },
-    userId,
-  );
+    createId: () => doc(collection(firebaseDb, "products")).id,
+    uploadImage: uploadProductImage,
+    deleteImages: deleteProductImages,
+    saveProduct: createProduct,
+    isDefiniteFailure: (error) =>
+      error instanceof FirebaseError &&
+      ["permission-denied", "invalid-argument", "unauthenticated"].includes(
+        error.code,
+      ),
+  });
 }

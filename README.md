@@ -22,7 +22,9 @@ npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio -
 - 실제 너비·높이·원본/저장 용량과 압축 버전은 Storage 사용자 메타데이터에 기록합니다. Firestore 상품의 이미지 구조는 기존 `{ url, path }`를 유지합니다. 기존 사진·설명 수정으로 재압축하지 않으며 신규 업로드에만 적용합니다.
 - 함수는 `asia-northeast3`, 메모리 1GiB, 동시 처리 2건, 최대 인스턴스 10개, 제한 시간 120초로 구성합니다. 탈퇴 접수·비활성 계정은 거부하고 저장 중 탈퇴가 시작된 경우 파일을 제거합니다.
 - 운영 적용 순서: `functions` 의존성 설치 → `npx firebase deploy --only functions:uploadProductImage --project <project-id>` → 앱 배포 → `npx firebase deploy --only storage --project <project-id>`. 규칙 적용 이후에는 이전 앱의 직접 업로드가 실패하므로 열린 등록 화면은 새로고침해야 합니다. 로컬 검증은 운영 배포를 수행하지 않습니다.
-- 등록 중 연결 종료·상품 DB 저장 실패로 남은 이미지의 자동 정리와 재시도 시 파일 재사용은 후속 단계입니다.
+- 등록 중 사진 업로드가 실패하거나 상품 저장이 명확히 거부되면, 이번 등록에서 저장 완료 응답을 받은 사진을 정리합니다. 삭제에 실패한 경로는 등록 화면에서 보관하고 다음 시도에 먼저 정리합니다. 이미 없는 파일은 정리 완료로 취급하며 계정이 바뀌면 기존 계정의 파일을 삭제하지 않습니다.
+- 상품 저장 결과가 불확실하면 사진과 원래 입력을 보존하고 화면을 잠근 뒤 `등록 확인`으로 재시도합니다. 같은 상품 ID의 Firestore 트랜잭션을 사용하므로 이미 저장된 상품을 덮어쓰거나 새 상품으로 중복 생성하지 않습니다. 결과 확인 중에는 자동 재시도하지 않습니다.
+- 복구 상태는 현재 등록 화면의 메모리에만 유지됩니다. 새로고침·화면 이탈·브라우저 종료 이후의 복구와 업로드 응답 자체가 유실되어 경로를 받지 못한 파일의 자동 회수는 포함하지 않습니다. 이 경우까지 처리하려면 서버의 업로드 작업 기록과 만료 정리가 추가로 필요합니다.
 
 ```bash
 npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage,functions "node --test functions/tests/product-image*.test.mjs && npx playwright test tests/e2e/product-registration.spec.ts"

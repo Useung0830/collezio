@@ -72,11 +72,26 @@ test("상품 등록은 사진을 압축해 저장하고 손상 사진의 오류�
     .click();
   await page.getByRole("button", { name: "무료 배송", exact: true }).click();
   const files = page.getByLabel("사진 첨부", { exact: true });
-  await files.setInputFiles({
-    name: "broken.png",
-    mimeType: "image/png",
-    buffer: Buffer.from("not an image"),
+  const original = await readFile("src/assets/images/product-luffy-cutout.png");
+  const uploadedPaths: string[] = [];
+  page.on("response", async (response) => {
+    if (response.url().endsWith("/uploadProductImage") && response.ok()) {
+      const body = await response.json();
+      if (body.result?.path) uploadedPaths.push(body.result.path);
+    }
   });
+  await files.setInputFiles([
+    {
+      name: "figure.png",
+      mimeType: "image/png",
+      buffer: original,
+    },
+    {
+      name: "broken.png",
+      mimeType: "image/png",
+      buffer: Buffer.from("not an image"),
+    },
+  ]);
   await page.getByRole("button", { name: "판매하기", exact: true }).click();
   await expect(
     page.getByText(
@@ -86,14 +101,13 @@ test("상품 등록은 사진을 압축해 저장하고 손상 사진의 오류�
   ).toBeVisible();
   await expect(page).toHaveURL(/\/products\/new$/);
   await expect(page.getByLabel("제목", { exact: true })).toHaveValue(title);
+  await expect.poll(() => uploadedPaths.length).toBe(1);
+  const removed = await request.get(
+    `http://127.0.0.1:9199/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(uploadedPaths[0])}`,
+  );
+  expect(removed.status()).toBe(404);
   await page.getByRole("button", { name: "broken.png 삭제" }).click();
 
-  const original = await readFile("src/assets/images/product-luffy-cutout.png");
-  await files.setInputFiles({
-    name: "figure.png",
-    mimeType: "image/png",
-    buffer: original,
-  });
   await page.getByRole("button", { name: "판매하기", exact: true }).click();
   await expect(page).toHaveURL(/\/collections$/, { timeout: 30_000 });
   const response = await request.get(`${documentsUrl}/products`, {
@@ -105,6 +119,9 @@ test("상품 등록은 사진을 압축해 저장하고 손상 사진의 오류�
   );
   expect(product).toBeTruthy();
   const stored = product.fields.images.arrayValue.values[0].mapValue.fields;
+  expect(uploadedPaths).toHaveLength(2);
+  expect(stored.path.stringValue).toBe(uploadedPaths[1]);
+  expect(uploadedPaths[1]).not.toBe(uploadedPaths[0]);
   expect(stored.path.stringValue).toMatch(new RegExp(`^products/${userId}/`));
   const metadataResponse = await request.get(
     `http://127.0.0.1:9199/v0/b/demo-collezio.appspot.com/o/${encodeURIComponent(stored.path.stringValue)}`,
