@@ -40,7 +40,7 @@ export default function ProductRegistrationRecovery({
     },
     retry: false,
     onSuccess: (id) => {
-      if (id) router.replace("/products/" + id);
+      if (id) router.replace("/collections");
       else onRefresh();
     },
     onError: (error) => {
@@ -106,7 +106,7 @@ export default function ProductRegistrationRecovery({
             disabled={mutation.isPending}
             onClick={() => mutation.mutate("resume")}
           >
-            {isCommitted ? "등록된 상품 보기" : "등록 이어서 진행"}
+            {isCommitted ? "내 컬렉션 보기" : "등록 이어서 진행"}
           </Button>
         )}
         <Button

@@ -245,10 +245,9 @@ test("업로드 응답 유실 후 창을 다시 열면 서버 기록으로 등�
   await reopened
     .getByRole("button", { name: "등록 이어서 진행", exact: true })
     .click();
-  await expect(reopened).toHaveURL(
-    "http://127.0.0.1:3100/products/" + registrationId,
-    { timeout: 30_000 },
-  );
+  await expect(reopened).toHaveURL("http://127.0.0.1:3100/collections", {
+    timeout: 30_000,
+  });
   expect(uploadRequests).toBe(0);
   const document = await request.get(
     documentsUrl + "/products/" + registrationId,
