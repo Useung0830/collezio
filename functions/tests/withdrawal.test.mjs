@@ -7,6 +7,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 
+import { cleanExpiredProductRegistrations } from "../src/cleanupProductRegistrations.js";
 import { parseWithdrawalFeedback } from "../src/parseWithdrawalFeedback.js";
 import { processWithdrawal } from "../src/processWithdrawal.js";
 import { getNicknameKey } from "../src/profileNickname.js";
@@ -54,6 +55,17 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
     request = db.doc(`withdrawalRequests/${id}`);
   const feedbackId = randomUUID();
   const batch = db.batch();
+  const registration = db.doc(`productRegistrations/${randomUUID()}`);
+  const registrationOwner = db.doc(`productRegistrationOwners/${id}`);
+  batch.set(registration, {
+    userId: id,
+    status: "pending",
+    product: { title: "탈퇴 중인 등록" },
+    files: [{ path: `products/${id}/image` }],
+    expiresAt: Timestamp.now(),
+    cleanupAt: Timestamp.now(),
+  });
+  batch.set(registrationOwner, { registrationId: registration.id });
   batch.set(ownProduct, { sellerId: id, favoriteCount: 0 });
   batch.set(otherProduct, { sellerId: "other", favoriteCount: 2 });
   batch.set(db.doc(`users/${id}/favorites/${otherProduct.id}`), {
@@ -114,6 +126,15 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   assert.equal(await processWithdrawal(services, id), "completed");
   assert.equal(await processWithdrawal(services, id), "completed");
   await assert.rejects(auth.getUser(id), { code: "auth/user-not-found" });
+  assert.equal((await registrationOwner.get()).exists, false);
+  assert.equal((await registration.get()).get("status"), "cleaning");
+  assert.equal((await registration.get()).get("product"), null);
+  await registration.update({
+    cleanupAt: Timestamp.fromMillis(0),
+    cleanupAfter: Timestamp.fromMillis(0),
+  });
+  await cleanExpiredProductRegistrations(services);
+  assert.equal((await registration.get()).get("status"), "cleaned");
   assert.equal((await ownProduct.get()).exists, false);
   assert.equal((await ownPost.get()).exists, false);
   assert.equal((await db.doc(`profiles/${id}`).get()).exists, false);
@@ -147,6 +168,7 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   await db.recursiveDelete(room);
   await Promise.all([
     request.delete(),
+    registration.delete(),
     otherProduct.delete(),
     otherPost.delete(),
     db.doc(`withdrawalFeedback/${feedbackId}`).delete(),

@@ -1,4 +1,4 @@
-import { FieldPath, FieldValue } from "firebase-admin/firestore";
+import { FieldPath, FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { getNicknameKey } from "./profileNickname.js";
 
@@ -45,6 +45,18 @@ export async function processDataPage(db, bucket, userId, stage, cursor) {
     return snapshot.empty ? null : scan ? snapshot.docs.at(-1).id : "";
   };
   switch (stage) {
+    case "productRegistrations":
+      await db.doc(`productRegistrationOwners/${userId}`).delete();
+      return page(
+        db.collection("productRegistrations").where("userId", "==", userId),
+        (document) =>
+          document.ref.update({
+            status: "cleaning",
+            product: null,
+            cleanupAt: Timestamp.now(),
+          }),
+        true,
+      );
     case "favorites":
       return page(db.collection(`users/${userId}/favorites`), (document) =>
         removeCountedDocument(

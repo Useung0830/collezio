@@ -8,14 +8,71 @@ import { error as logError } from "firebase-functions/logger";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 
+import {
+  cancelProductRegistration as cancelRegistration,
+  cleanExpiredProductRegistrations,
+} from "./cleanupProductRegistrations.js";
+import {
+  acknowledgeProductRegistration as acknowledgeRegistration,
+  beginProductRegistration as beginRegistration,
+  completeProductRegistration as completeRegistration,
+  getProductRegistration as getRegistration,
+} from "./manageProductRegistration.js";
 import { parseWithdrawalFeedback } from "./parseWithdrawalFeedback.js";
 import { processWithdrawal } from "./processWithdrawal.js";
 import { isNicknameAvailable } from "./profileNickname.js";
+import { saveProductImage } from "./saveProductImage.js";
 import { savePublicProfile } from "./savePublicProfile.js";
 
 initializeApp();
 const db = getFirestore();
 const services = () => ({ db, auth: getAuth(), bucket: getStorage().bucket() });
+
+const registrationOptions = {
+  region: "asia-northeast3",
+  timeoutSeconds: 120,
+  maxInstances: 10,
+};
+export const acknowledgeProductRegistration = onCall(
+  registrationOptions,
+  (request) =>
+    acknowledgeRegistration(services(), request.auth?.uid, request.data),
+);
+export const beginProductRegistration = onCall(registrationOptions, (request) =>
+  beginRegistration(services(), request.auth?.uid, request.data),
+);
+export const getProductRegistration = onCall(registrationOptions, (request) =>
+  getRegistration(services(), request.auth?.uid, request.data),
+);
+export const completeProductRegistration = onCall(
+  registrationOptions,
+  (request) =>
+    completeRegistration(services(), request.auth?.uid, request.data),
+);
+export const cancelProductRegistration = onCall(
+  registrationOptions,
+  (request) => cancelRegistration(services(), request.auth?.uid, request.data),
+);
+export const cleanupProductRegistrations = onSchedule(
+  {
+    region: "asia-northeast3",
+    schedule: "every 10 minutes",
+    timeoutSeconds: 540,
+  },
+  () => cleanExpiredProductRegistrations(services()),
+);
+
+export const uploadProductImage = onCall(
+  {
+    region: "asia-northeast3",
+    memory: "1GiB",
+    concurrency: 2,
+    maxInstances: 10,
+    timeoutSeconds: 120,
+  },
+  async (request) =>
+    saveProductImage(services(), request.auth?.uid, request.data),
+);
 
 export const checkNickname = onCall(
   { region: "asia-northeast3" },

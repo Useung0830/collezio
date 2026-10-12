@@ -32,6 +32,8 @@ import {
   uploadBytes,
 } from "firebase/storage";
 
+import { seedProduct } from "./helpers/seedProduct.mjs";
+
 test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
   assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
   assert.ok(process.env.FIREBASE_AUTH_EMULATOR_HOST);
@@ -105,22 +107,25 @@ test("상품 채팅방 생성 API와 비공개 규칙", async (t) => {
     );
   const newProduct = (db, sellerId, kind = "sale") => {
     const ref = doc(collection(db, "products"));
-    return setDoc(ref, {
-      title: "채팅 테스트 상품",
-      description: "상품별 채팅 확인",
+    return seedProduct(
+      {
+        title: "채팅 테스트 상품",
+        description: "상품별 채팅 확인",
+        sellerId,
+        status: "available",
+        transaction:
+          kind === "sale"
+            ? { type: "sale", price: 12000 }
+            : { type: "exchange", desiredItemName: "교환 상품" },
+        delivery: { type: "parcel", shippingFee: 0 },
+        images: [
+          { url: "https://example.com/product.png", path: "test/product" },
+        ],
+        favoriteCount: 0,
+      },
       sellerId,
-      status: "available",
-      transaction:
-        kind === "sale"
-          ? { type: "sale", price: 12000 }
-          : { type: "exchange", desiredItemName: "교환 상품" },
-      delivery: { type: "parcel", shippingFee: 0 },
-      images: [
-        { url: "https://example.com/product.png", path: "test/product" },
-      ],
-      favoriteCount: 0,
-      createdAt: serverTimestamp(),
-    }).then(() => ref.id);
+      ref.id,
+    );
   };
   try {
     const { user } = await register(firebaseAuth);

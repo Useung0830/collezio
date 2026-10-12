@@ -2,20 +2,24 @@
 import { useState } from "react";
 import { toast } from "react-toastify/unstyled";
 import { useRouter } from "next/navigation";
+import { FirebaseError } from "firebase/app";
 
 import Button from "@/components/common/button/Button";
 import IconButton from "@/components/common/button/IconButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
+import { useProductRegistrationQuery } from "@/features/products/hooks/useProductRegistrationQuery";
 import { useRegisterProductMutation } from "@/features/products/hooks/useRegisterProductMutation";
 import type {
   ProductDelivery,
   ProductTransaction,
 } from "@/features/products/types/product";
+import type { RegisterProductInput } from "@/features/products/types/productRegistration";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 
+import ProductRegistrationRecovery from "./ProductRegistrationRecovery";
 import TradeLocationField from "./TradeLocationField";
 
 type TransactionType = "exchange" | "sale";
@@ -25,6 +29,7 @@ export default function NewProductForm() {
   const router = useRouter();
 
   const registerProductMutation = useRegisterProductMutation();
+  const recoveryQuery = useProductRegistrationQuery();
 
   const [transactionType, setTransactionType] =
     useState<TransactionType>("exchange");
@@ -36,6 +41,29 @@ export default function NewProductForm() {
     address: "",
     detail: "",
   });
+
+  const isFormLocked =
+    registerProductMutation.isPending ||
+    registerProductMutation.isSuccess ||
+    recoveryQuery.isChecking ||
+    recoveryQuery.isError ||
+    Boolean(recoveryQuery.data);
+
+  const handleRegister = (input: RegisterProductInput) => {
+    registerProductMutation.mutate(input, {
+      onSuccess: () => {
+        toast.success("상품이 등록되었습니다.");
+        router.replace("/collections");
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof FirebaseError
+            ? "상품 등록에 실패했습니다. 입력값과 연결 상태를 확인해주세요."
+            : error.message,
+        );
+      },
+    });
+  };
 
   const handleClose = () => {
     router.back();
@@ -50,6 +78,8 @@ export default function NewProductForm() {
     ) {
       return;
     }
+
+    if (isFormLocked) return;
 
     const formData = new FormData(event.currentTarget);
     const title = String(formData.get("title") ?? "").trim();
@@ -111,20 +141,7 @@ export default function NewProductForm() {
       delivery = { type: "parcel", shippingFee: fee };
     }
 
-    registerProductMutation.mutate(
-      { title, description, transaction, delivery, files },
-      {
-        onSuccess: () => {
-          toast.success("상품이 등록되었습니다.");
-          router.replace("/collections");
-        },
-        onError: () => {
-          toast.error(
-            "상품 등록에 실패했습니다. 입력값과 연결 상태를 확인해주세요.",
-          );
-        },
-      },
-    );
+    handleRegister({ title, description, transaction, delivery, files });
   };
 
   const isExchange = transactionType === "exchange";
@@ -139,138 +156,166 @@ export default function NewProductForm() {
         <h1 className="text-heading-24 text-black-900">상품 등록</h1>
       </div>
 
-      <form className="flex flex-col gap-7" onSubmit={handleSubmit}>
-        <ImageUploader
-          maxImageCount={10}
-          showRepresentativeLabel
-          onFilesChange={setFiles}
+      {recoveryQuery.isChecking && (
+        <p role="status" className="text-body-16 text-black-900">
+          이전 등록 작업을 확인하고 있습니다.
+        </p>
+      )}
+      {recoveryQuery.isError && (
+        <div className="text-body-16 text-black-900">
+          <p role="alert">
+            이전 등록 상태를 확인하지 못했습니다. 연결 상태를 확인해주세요.
+          </p>
+          <Button type="button" onClick={() => void recoveryQuery.refetch()}>
+            다시 확인
+          </Button>
+        </div>
+      )}
+      {recoveryQuery.data && (
+        <ProductRegistrationRecovery
+          key={recoveryQuery.data.id}
+          registration={recoveryQuery.data}
+          onRefresh={() => void recoveryQuery.refetch()}
         />
-
-        <label className="text-label-16 text-black-900 flex flex-col gap-3">
-          제목
-          <input
-            name="title"
-            type="text"
-            required
-            placeholder="제목을 입력해주세요."
-            className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 h-13 rounded-2xl border px-5 outline-none"
+      )}
+      <form className="flex flex-col gap-7" onSubmit={handleSubmit}>
+        <fieldset
+          disabled={isFormLocked}
+          className="flex min-w-0 flex-col gap-7"
+        >
+          <legend className="sr-only">상품 정보</legend>
+          <ImageUploader
+            maxImageCount={10}
+            showRepresentativeLabel
+            onFilesChange={setFiles}
+            accept="image/jpeg,image/png,image/webp"
+            disabled={isFormLocked}
           />
-        </label>
 
-        <label className="text-label-16 text-black-900 flex flex-col gap-3">
-          자세한 설명
-          <textarea
-            name="description"
-            required
-            placeholder="게시글 내용을 작성해 주세요."
-            className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 h-29 resize-none rounded-2xl border px-5 py-4 outline-none"
-          />
-        </label>
-
-        <fieldset className="flex flex-col">
-          <legend className="text-label-16 text-black-900 mb-3">
-            거래 방법
-          </legend>
-          <div className="flex gap-2">
-            <RadioOption
-              name="transactionType"
-              value="exchange"
-              checked={isExchange}
-              onChange={() => setTransactionType("exchange")}
-            >
-              교환하기
-            </RadioOption>
-            <RadioOption
-              name="transactionType"
-              value="sale"
-              checked={!isExchange}
-              onChange={() => setTransactionType("sale")}
-            >
-              판매하기
-            </RadioOption>
-          </div>
-          <input
-            name={isExchange ? "desiredItem" : "price"}
-            type={isExchange ? "text" : "number"}
-            min={isExchange ? undefined : 0}
-            required
-            placeholder={
-              isExchange
-                ? "교환을 희망하는 상품명을 입력해주세요."
-                : "판매 가격을 입력해주세요."
-            }
-            className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 mt-3 h-13 rounded-2xl border px-5 outline-none"
-          />
-        </fieldset>
-
-        <fieldset className="flex flex-col">
-          <legend className="text-label-16 text-black-900 mb-3">
-            거래 방식
-          </legend>
-          <div className="flex gap-2">
-            <RadioOption
-              name="deliveryType"
-              value="direct"
-              checked={isDirect}
-              onChange={() => setDeliveryType("direct")}
-            >
-              직거래
-            </RadioOption>
-            <RadioOption
-              name="deliveryType"
-              value="parcel"
-              checked={!isDirect}
-              onChange={() => setDeliveryType("parcel")}
-            >
-              택배 거래
-            </RadioOption>
-          </div>
-          {isDirect ? (
-            <TradeLocationField
-              value={tradeLocation}
-              onChange={setTradeLocation}
+          <label className="text-label-16 text-black-900 flex flex-col gap-3">
+            제목
+            <input
+              name="title"
+              type="text"
+              required
+              placeholder="제목을 입력해주세요."
+              className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 h-13 rounded-2xl border px-5 outline-none"
             />
-          ) : (
-            <div className="mt-3 flex gap-2">
-              <label className="border-black-300 focus-within:border-black-900 flex h-13 min-w-0 flex-1 items-center rounded-2xl border px-5">
-                <span className="sr-only">택배비</span>
-                <input
-                  name="shippingFee"
-                  type="number"
-                  min={0}
-                  inputMode="numeric"
-                  required={!isFreeShipping}
-                  disabled={isFreeShipping}
-                  value={shippingFee}
-                  placeholder={
-                    isFreeShipping ? "무료" : "택배비를 입력해주세요."
-                  }
-                  className="text-body-16 text-black-900 placeholder:text-black-400 min-w-0 flex-1 outline-none disabled:bg-transparent"
-                  onChange={(event) => setShippingFee(event.target.value)}
-                />
-                {!isFreeShipping && (
-                  <span className="text-body-16 text-black-600">원</span>
-                )}
-              </label>
-              <ToggleButton
-                size="compact"
-                shape="rounded"
-                isPressed={isFreeShipping}
-                onClick={() => setIsFreeShipping((isFree) => !isFree)}
-              >
-                무료 배송
-              </ToggleButton>
-            </div>
-          )}
-        </fieldset>
+          </label>
 
+          <label className="text-label-16 text-black-900 flex flex-col gap-3">
+            자세한 설명
+            <textarea
+              name="description"
+              required
+              placeholder="게시글 내용을 작성해 주세요."
+              className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 h-29 resize-none rounded-2xl border px-5 py-4 outline-none"
+            />
+          </label>
+
+          <fieldset className="flex flex-col">
+            <legend className="text-label-16 text-black-900 mb-3">
+              거래 방법
+            </legend>
+            <div className="flex gap-2">
+              <RadioOption
+                name="transactionType"
+                value="exchange"
+                checked={isExchange}
+                onChange={() => setTransactionType("exchange")}
+              >
+                교환하기
+              </RadioOption>
+              <RadioOption
+                name="transactionType"
+                value="sale"
+                checked={!isExchange}
+                onChange={() => setTransactionType("sale")}
+              >
+                판매하기
+              </RadioOption>
+            </div>
+            <input
+              name={isExchange ? "desiredItem" : "price"}
+              type={isExchange ? "text" : "number"}
+              min={isExchange ? undefined : 0}
+              required
+              placeholder={
+                isExchange
+                  ? "교환을 희망하는 상품명을 입력해주세요."
+                  : "판매 가격을 입력해주세요."
+              }
+              className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 mt-3 h-13 rounded-2xl border px-5 outline-none"
+            />
+          </fieldset>
+
+          <fieldset className="flex flex-col">
+            <legend className="text-label-16 text-black-900 mb-3">
+              거래 방식
+            </legend>
+            <div className="flex gap-2">
+              <RadioOption
+                name="deliveryType"
+                value="direct"
+                checked={isDirect}
+                onChange={() => setDeliveryType("direct")}
+              >
+                직거래
+              </RadioOption>
+              <RadioOption
+                name="deliveryType"
+                value="parcel"
+                checked={!isDirect}
+                onChange={() => setDeliveryType("parcel")}
+              >
+                택배 거래
+              </RadioOption>
+            </div>
+            {isDirect ? (
+              <TradeLocationField
+                value={tradeLocation}
+                onChange={setTradeLocation}
+              />
+            ) : (
+              <div className="mt-3 flex gap-2">
+                <label className="border-black-300 focus-within:border-black-900 flex h-13 min-w-0 flex-1 items-center rounded-2xl border px-5">
+                  <span className="sr-only">택배비</span>
+                  <input
+                    name="shippingFee"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    required={!isFreeShipping}
+                    disabled={isFreeShipping}
+                    value={shippingFee}
+                    placeholder={
+                      isFreeShipping ? "무료" : "택배비를 입력해주세요."
+                    }
+                    className="text-body-16 text-black-900 placeholder:text-black-400 min-w-0 flex-1 outline-none disabled:bg-transparent"
+                    onChange={(event) => setShippingFee(event.target.value)}
+                  />
+                  {!isFreeShipping && (
+                    <span className="text-body-16 text-black-600">원</span>
+                  )}
+                </label>
+                <ToggleButton
+                  size="compact"
+                  shape="rounded"
+                  isPressed={isFreeShipping}
+                  onClick={() => setIsFreeShipping((isFree) => !isFree)}
+                >
+                  무료 배송
+                </ToggleButton>
+              </div>
+            )}
+          </fieldset>
+        </fieldset>
         <Button
           type="submit"
           shape="rounded"
           className="h-13"
           disabled={
-            registerProductMutation.isPending ||
-            registerProductMutation.isSuccess ||
+            isFormLocked ||
             files.length === 0 ||
             (isDirect && !tradeLocation.address)
           }
