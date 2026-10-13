@@ -1,9 +1,61 @@
-.banner {
+.background {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 500ms ease;
+}
+
+.active {
+  opacity: 1;
+}
+
+.collection {
   background-image: url("../../../assets/images/ad-banner-mobile.webp");
 }
 
+.robots {
+  background-image: url("../../../assets/images/ad-banner-robots-mobile.webp");
+}
+
+.cards {
+  background-image: url("../../../assets/images/ad-banner-cards-mobile.webp");
+}
+
+.plush {
+  background-image: url("../../../assets/images/ad-banner-plush-mobile.webp");
+}
+
+.miniatures {
+  background-image: url("../../../assets/images/ad-banner-miniatures-mobile.webp");
+}
+
 @media (min-width: 768px) {
-  .banner {
+  .collection {
     background-image: url("../../../assets/images/ad-banner-desktop.webp");
+  }
+
+  .robots {
+    background-image: url("../../../assets/images/ad-banner-robots-desktop.webp");
+  }
+
+  .cards {
+    background-image: url("../../../assets/images/ad-banner-cards-desktop.webp");
+  }
+
+  .plush {
+    background-image: url("../../../assets/images/ad-banner-plush-desktop.webp");
+  }
+
+  .miniatures {
+    background-image: url("../../../assets/images/ad-banner-miniatures-desktop.webp");
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background {
+    transition: none;
   }
 }
