@@ -26,7 +26,7 @@ export default function ProductCard({
   const isShowcase = appearance === "showcase";
   const productImage = product.image;
   const isSale = product.transaction.type === "sale";
-  const transactionColor = isSale ? "bg-brand-blue" : "bg-brand-green";
+  const transactionColor = isSale ? "bg-brand-blue" : "bg-brand-green-dark";
 
   const transactionLabel =
     product.transaction.type === "sale"
