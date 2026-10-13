@@ -46,7 +46,7 @@ export default function RegisteredProductInfo({
             )}
             <div className="flex items-center gap-2">
               <span
-                className={`text-label-16 shrink-0 rounded-full px-2.5 py-1 text-white ${isSale ? "bg-brand-blue" : "bg-brand-green"}`}
+                className={`text-label-16 shrink-0 rounded-full px-2.5 py-1 text-white ${isSale ? "bg-brand-blue" : "bg-brand-green-dark"}`}
               >
                 {isSale ? "판매" : "교환"}
               </span>

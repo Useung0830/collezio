@@ -62,7 +62,7 @@ export default function ChatProductSummary({
         {transaction && (
           <div className="mt-1 flex items-center gap-2">
             <span
-              className={`text-caption-12-bold shrink-0 rounded-full px-2 py-0.5 text-white ${transaction.type === "sale" ? "bg-brand-blue" : "bg-brand-green"}`}
+              className={`text-caption-12-bold shrink-0 rounded-full px-2 py-0.5 text-white ${transaction.type === "sale" ? "bg-brand-blue" : "bg-brand-green-dark"}`}
             >
               {transaction.type === "sale" ? "판매" : "교환"}
             </span>

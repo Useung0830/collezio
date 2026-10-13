@@ -33,12 +33,16 @@ export default function Header() {
         </Link>
         <HeaderSearchBar className="max-w-150 min-w-0 flex-1 max-lg:hidden" />
         <ul className="flex shrink-0 gap-5 max-lg:hidden">
-          <Link href="/chat" className="whitespace-nowrap">
-            채팅
-          </Link>
-          <Link href="/community" className="whitespace-nowrap">
-            커뮤니티
-          </Link>
+          <li>
+            <Link href="/chat" className="whitespace-nowrap">
+              채팅
+            </Link>
+          </li>
+          <li>
+            <Link href="/community" className="whitespace-nowrap">
+              커뮤니티
+            </Link>
+          </li>
         </ul>
         <div className="flex h-10 w-46 shrink-0 items-center justify-end max-lg:hidden">
           {isLoggedIn === null ? (
