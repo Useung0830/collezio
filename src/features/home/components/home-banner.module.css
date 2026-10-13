@@ -1,0 +1,9 @@
+.banner {
+  background-image: url("../../../assets/images/ad-banner-mobile.webp");
+}
+
+@media (min-width: 768px) {
+  .banner {
+    background-image: url("../../../assets/images/ad-banner-desktop.webp");
+  }
+}

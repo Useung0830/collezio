@@ -1,11 +1,10 @@
-import bannerBackground from "@/assets/images/ad-banner-background.png";
+import styles from "./home-banner.module.css";
 
 export default function HomeBanner() {
   return (
     <section
       aria-labelledby="home-banner-title"
-      style={{ backgroundImage: `url(${bannerBackground.src})` }}
-      className="text-black-900 flex min-h-100 flex-col rounded-3xl bg-[#eef0ff] bg-[length:auto_220px] bg-right-bottom bg-no-repeat px-6 pt-7 pb-56 md:min-h-80 md:justify-center md:bg-cover md:bg-center md:px-10 md:py-10 lg:px-20"
+      className={`${styles.banner} text-black-900 flex aspect-4/5 min-h-110 flex-col rounded-3xl bg-[#eef0ff] bg-cover bg-center bg-no-repeat px-6 py-7 md:aspect-auto md:min-h-80 md:justify-center md:px-10 md:py-10 lg:px-20`}
     >
       <h1 id="home-banner-title" className="text-banner-title">
         소중한 컬렉션을
