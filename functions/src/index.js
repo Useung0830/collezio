@@ -90,6 +90,15 @@ export const saveProfile = onCall(
   async (request) => {
     if (!request.auth)
       throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    if (
+      request.auth.token.firebase?.sign_in_provider === "google.com" &&
+      request.data?.mode === "create"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "닉네임과 필수 약관 동의를 완료해주세요.",
+      );
+    }
     return savePublicProfile(
       db,
       request.auth.uid,

@@ -1,5 +1,6 @@
 import { doc, getDoc } from "firebase/firestore";
 
+import { isGoogleOnlyUser } from "@/features/auth/utils/isGoogleOnlyUser";
 import { createPublicProfile } from "@/features/user/api/createPublicProfile";
 import { parsePublicProfile } from "@/features/user/utils/parsePublicProfile";
 
@@ -13,7 +14,10 @@ export async function getPublicProfile(userId: string) {
   const snapshot = await getDoc(doc(firebaseDb, "profiles", userId));
   if (snapshot.exists())
     return parsePublicProfile(snapshot.id, snapshot.data());
-  if (firebaseAuth.currentUser?.uid === userId)
+  if (
+    firebaseAuth.currentUser?.uid === userId &&
+    !isGoogleOnlyUser(firebaseAuth.currentUser)
+  )
     return createPublicProfile(userId);
   return null;
 }

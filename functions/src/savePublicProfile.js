@@ -45,12 +45,19 @@ function parseProfileImage(image, userId, bucketName) {
 
 export async function savePublicProfile(db, userId, input, bucketName) {
   if (!userId) throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-  if (!input || !["create", "update"].includes(input.mode)) {
+  if (!input || !["create", "update", "complete-signup"].includes(input.mode)) {
     throw new HttpsError("invalid-argument", "프로필 요청을 확인해주세요.");
+  }
+  const isSignup = input.mode === "complete-signup";
+  if (
+    isSignup &&
+    (input.hasAcceptedTerms !== true || input.hasAcceptedPrivacy !== true)
+  ) {
+    throw new HttpsError("invalid-argument", "필수 약관에 동의해주세요.");
   }
   const nickname = parseNickname(input.nickname);
   const image = parseProfileImage(input.image, userId, bucketName);
-  if (input.mode === "create" && input.image !== undefined) {
+  if ((input.mode === "create" || isSignup) && input.image !== undefined) {
     throw new HttpsError("invalid-argument", "가입 후 사진을 설정해주세요.");
   }
   const profileRef = db.doc(`profiles/${userId}`);
@@ -69,6 +76,8 @@ export async function savePublicProfile(db, userId, input, bucketName) {
         "permission-denied",
         "탈퇴 처리 중에는 프로필을 수정할 수 없습니다.",
       );
+    if (isSignup && profile.get("googleSignupCompleted") === true)
+      return { profile: profile.data() };
     // 생성 재시도는 이미 저장된 프로필을 덮어쓰지 않습니다.
     if (input.mode === "create" && profile.exists)
       return { profile: profile.data() };
@@ -88,7 +97,18 @@ export async function savePublicProfile(db, userId, input, bucketName) {
       previousClaimRef && previousClaimRef.path !== claimRef.path
         ? await transaction.get(previousClaimRef)
         : null;
-    const changes = { nickname, ...image };
+    const changes = {
+      nickname,
+      ...image,
+      ...(isSignup ? { googleSignupCompleted: true } : {}),
+    };
+    if (isSignup)
+      transaction.set(db.doc(`users/${userId}/account/signup`), {
+        hasAcceptedTerms: true,
+        hasAcceptedPrivacy: true,
+        acceptedAt: FieldValue.serverTimestamp(),
+        provider: "google.com",
+      });
     if (profile.exists) transaction.update(profileRef, changes);
     else
       transaction.create(profileRef, {
