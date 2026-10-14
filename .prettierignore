@@ -1,5 +1,11 @@
 .next
+.next-e2e
+playwright-report
+test-results
+.firebase
 node_modules
 out
 build
 package-lock.json
+
+functions/node_modules/

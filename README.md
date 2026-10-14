@@ -1,5 +1,88 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 상세 페이지 공유 메타데이터
+
+- 상품·게시글 상세는 공개 Firestore 문서에서 제목·본문 요약·대표 이미지를 조회해 Open Graph와 Twitter 카드를 생성합니다. 본문 화면의 데이터 조회는 기존 클라이언트 방식을 유지합니다.
+- `SITE_URL`은 canonical과 공유 URL의 기준 origin입니다. 미설정 시 `https://collezio.vercel.app`을 사용하며, 운영 도메인이 바뀌면 배포 환경변수도 변경해야 합니다. 경로·쿼리·인증 정보가 없는 HTTPS 주소를 사용하고 로컬 테스트만 HTTP를 허용합니다.
+- 공유 이미지는 현재 Storage 버킷과 상품 판매자 또는 게시글 작성자·문서 경로가 일치하는 첫 유효 이미지입니다. 원본 다운로드 URL을 사용하며, 형식이 잘못되었거나 사진이 없으면 기존 서비스 배너인 `/share-default.jpg`를 사용합니다. 메타데이터 요청마다 이미지 파일의 존재 여부를 별도로 조회하지는 않습니다.
+- 문서 미존재·권한 거부는 기본 공유 문구·이미지와 `noindex`로 처리하고, 일시적 조회 장애는 기본 공유 정보로 처리합니다. Firebase 규칙 변경 없이 공개 REST 조회를 사용하며, 실제 공유 앱의 미리보기와 캐시 갱신은 사이트 배포 후 별도로 확인합니다.
+
+```bash
+npm run check
+npm run test:unit
+npm run build
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage "npx playwright test tests/e2e/detail-metadata.spec.ts"
+```
+
+## 상품 이미지 업로드
+
+- 상품 등록 버튼을 누르면 서버에 등록 작업을 만들고 사진을 한 장씩 전송합니다. JPEG·PNG·WebP 정지 이미지, 장당 5MiB·4천만 픽셀 이하이며 최대 10장입니다. Base64 요청은 파일보다 약 1/3 커집니다. 압축은 서버에서 수행하므로 최초 업로드 전송량은 줄지 않습니다.
+- Sharp로 리사이즈 없이 WebP 품질 90 변환, 방향 보정, 메타데이터 제거를 적용합니다. 가로·세로는 방향 보정 시 교환될 수 있고 무손실 압축은 아닙니다. 결과가 커지면 원래 형식으로도 인코딩해 비교하며 모든 결과가 원본보다 크면 거부합니다.
+- 서버 작업 기록은 `productRegistrations/{등록ID}`, 사용자별 최근 작업은 `productRegistrationOwners/{사용자ID}`입니다. 사진 ID·SHA-256·크기·형식·경로를 업로드 전에 기록하고 `products/{사용자ID}/{등록ID}-{사진ID}`에 저장합니다. 같은 ID에 다른 파일을 전송하면 거부하고 같은 파일의 재시도는 기존 경로·토큰을 재사용합니다.
+- 상품 확정은 서버에서 상품 문서 생성과 작업 상태 `committed` 전환을 한 트랜잭션으로 처리합니다. 상품 ID는 등록 ID이며 재시도해도 중복 생성하지 않습니다. 클라이언트의 직접 상품 생성, 작업 기록 읽기·쓰기, 상품 이미지 생성·삭제는 규칙으로 차단합니다. 기존 상품 조회·찜·거래 상태 변경은 유지합니다.
+- 등록 버튼을 누른 시점의 제목·설명·거래 정보도 작업에 보관합니다. 브라우저에는 사용자별 작업 ID만 저장합니다. 창을 다시 열면 서버 상태로 이어서 등록하거나 이미 등록된 상품을 확인할 수 있습니다. 아직 서버에 전송되지 않은 원본 사진은 다시 선택해야 하며 내용 해시로 대조합니다. 브라우저 저장소를 사용할 수 없어도 서버의 최근 작업 기록으로 복구합니다. 등록 완료 응답을 확인한 뒤 서버의 최근 작업 연결을 해제합니다.
+- 마지막 업로드 활동 후 24시간 동안 미완료 작업을 유지합니다. 조회만으로 유효기간을 연장하지 않습니다. `cleanupProductRegistrations`가 10분마다 `cleanupAt`이 지난 기록을 최대 50건씩 조회합니다. 정리 상태로 전환한 뒤 파일을 삭제하고 실패하면 다음 실행에서 재시도합니다. 파일이 이미 없어도 성공으로 처리합니다. 정리 시작 후 10분의 유예를 두고 다시 삭제해 늦게 끝난 업로드를 회수합니다. 작업량·실패에 따라 실제 정리 완료 시각은 지연될 수 있습니다.
+- 정리 시작과 등록 확정은 같은 작업 문서를 통해 경합을 제어합니다. 완료된 상품은 정리하지 않으며, 취소·만료된 작업은 재업로드할 수 없습니다. 만료·완료 기록은 재시도 방지를 위해 자동 삭제하지 않습니다. 탈퇴 시 신규 작업을 차단하고 남은 기록을 정리 대기 상태로 넘깁니다. 기존 단계에서 작업 기록 없이 저장된 과거 파일은 이 만료 정리의 대상이 아닙니다.
+- 업로드 함수: `asia-northeast3`, 메모리 1GiB, 동시 처리 2건, 최대 인스턴스 10개, 제한 시간 120초. 중복 처리 방지 임대 시간은 5분이며, 실행 중단 직후 재시도는 임대 만료까지 대기할 수 있습니다.
+
+운영 반영에는 앱뿐 아니라 Functions와 Firestore·Storage 규칙을 함께 배포해야 합니다. 이번 변경은 업로드 요청 형식과 상품 생성 경로가 바뀌므로 유지보수 시간에 함수·규칙을 먼저 반영하고 새 앱을 배포한 뒤 기존 등록 화면을 새로고침하도록 안내합니다. 로컬 검증은 운영 배포를 수행하지 않습니다. 예약 정리는 배포된 Scheduler가 실행하며, 로컬에서는 예약 함수의 처리 함수를 직접 호출해 검증합니다.
+
+```bash
+npx firebase deploy --only functions,firestore:rules,storage --project <project-id>
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage,functions "npm run test:integration && node tests/resetEmulators.mjs && npx playwright test tests/e2e/product-registration.spec.ts"
+```
+
+## 기존 상품 이미지 압축 비교
+
+`node scripts/migrateProductImages.mjs --dry-run`은 운영 `collezio-e3a8d` 상품에 연결된 이미지를 읽어 현재 업로드와 같은 압축 함수로 비교합니다. Firebase CLI 로그인과 운영 읽기 권한이 필요합니다. `--apply`는 원본을 보존하고 압축본만 새 경로에 저장하며 상품 문서를 변경하지 않습니다.
+
+- 결과는 `.local-review/image-migration/{실행ID}/report.json`과 `report.csv`에 기록합니다. 원본·대상 경로, 원본 객체 세대, SHA-256, 처리 전후 용량·해상도·형식, 절감률, 실패·건너뜀 사유를 포함합니다. 보고서는 Git에 포함하지 않습니다.
+- 이미 압축 버전 1인 이미지, 5MiB 초과 파일, 절감되지 않는 파일은 건너뜁니다. 현재 압축 함수의 정지 이미지·픽셀 제한도 그대로 적용합니다.
+- 저장 경로는 원본 경로와 객체 세대로 결정하며 기존 압축본을 덮어쓰지 않습니다. 저장 후 다시 다운로드해 해시를 검증합니다. 중단 후 재실행하면 일치하는 압축본을 재사용합니다.
+- 상품 연결 변경과 원본 삭제는 수행하지 않습니다. 따라서 보고서의 절감량은 교체 시 예상치이며, 비교본을 보존하는 동안 실제 Storage 사용량은 증가합니다.
+
+## 커뮤니티
+
+구현 범위, 데이터 처리, 실패 복구와 로컬 검증 방법은 [커뮤니티 구현 현황](docs/community.md)을 참고하세요.
+
+## 채팅 신고와 차단
+
+- 신고는 `users/{신고자ID}/chatReports/{신고ID}`에 저장합니다. 채팅 상대만 신고할 수 있으며, 신고자만 개별 접수 내용을 조회할 수 있습니다. 상대방은 신고 내용을 읽을 수 없습니다.
+- 신고 사유와 최대 1,000자의 상세 내용을 받으며, 기타 사유는 상세 내용이 필수입니다. 실패 후 같은 요청 ID로 재시도해 중복 저장을 방지합니다. 신고 접수는 자동 차단이나 관리자 제재를 수행하지 않습니다.
+- 차단은 `users/{사용자ID}/chatBlocks/{상대ID}`에 저장하며, 해당 사용자와의 모든 채팅방에 적용합니다. 기존 메시지와 목록은 유지하고 양쪽의 새 메시지 전송 및 새 채팅방 생성을 제한합니다.
+- 차단 목록은 본인만 조회할 수 있습니다. 상대방은 자신과의 차단 문서만 조회할 수 있으며 화면에는 일반적인 전송 불가 안내를 표시합니다. 상호 차단은 양쪽 모두 해제해야 전송을 재개할 수 있습니다.
+- 관리자 신고 처리 화면은 후속 작업입니다. 운영 반영 시 애플리케이션과 함께 `firestore.rules`를 대상 Firebase 프로젝트에 배포해야 합니다. 로컬 테스트는 운영 규칙을 배포하지 않습니다.
+
+## 채팅 이미지 전송
+
+- 카메라 버튼으로 JPG·PNG·WebP를 최대 10장(장당 5MB) 선택합니다. 추가 선택과 개별 삭제가 가능하며, 입력창 위에서 미리보기를 확인합니다.
+- 이미지와 텍스트는 한 트랜잭션으로 확정하되 별도 메시지로 저장합니다. 이미지 ID는 전송 ID의 `-0`, 텍스트 ID는 `-1`로 끝납니다. 동일 서버 시각의 문서는 Firestore의 문서 ID 정렬을 사용하므로 이미지가 먼저 표시됩니다.
+- 단일 이미지 경로는 `chat/{roomId}/{senderId}/{imageMessageId}`, 묶음은 그 아래 `/{index}`(0~9)입니다. 묶음의 `imagePaths` 배열을 하나의 메시지에 저장하며 기존 `imagePath` 메시지도 표시합니다. 다운로드 토큰 URL을 메시지에 저장하지 않고, 인증된 Storage 다운로드로 표시합니다. 채팅 참여자만 읽을 수 있고, 상대방은 메시지 확정 전의 업로드를 읽을 수 없습니다.
+- 썸네일은 빈칸 없이 채우는 그리드이며, 7~10장은 세로로 긴 묶음으로 표시합니다. 묶음을 누르면 첫 사진부터 상세 창이 열립니다. 좌우 버튼·방향키·휴대폰 스와이프로 이동하고 현재 사진을 저장하거나 공유할 수 있습니다. 파일 공유를 지원하지 않는 브라우저는 저장 후 공유 안내를 표시합니다. 공유 API 연결은 자동 테스트로 검증하며 실제 공유 대상 앱과 OS 저장 위치는 기기에 따라 다릅니다.
+- 업로드 허가 문서는 `chatRooms/{roomId}/imageUploads/{imageMessageId}`에 저장하며 10분 동안 유효합니다. 차단 시 새 허가와 메시지 확정을 거부합니다. 이미 발급된 허가로 진행 중인 업로드가 완료되더라도 차단 후 메시지 확정은 거부됩니다.
+- 실패 시 입력과 요청 ID를 유지합니다. 재시도는 업로드된 파일의 SHA-256을 확인해 재사용하며 전송된 이미지는 덮어쓰거나 삭제하지 않습니다. 실패 후 화면을 떠나면 미확정 파일·허가 문서가 남을 수 있으며 자동 정리는 후속 작업입니다.
+- 배포 시 `firebase deploy --only firestore:rules,storage --project <project-id>`를 실행해야 합니다. 인증 다운로드를 위해 Storage 버킷의 CORS에서 앱의 origin과 GET 요청을 허용해야 합니다. 에뮬레이터 검증과 실제 Firebase 배포 후 검증을 구분합니다.
+- `storage.cors.json`은 로컬 3000 포트와 `https://collezio.vercel.app`의 GET을 허용합니다. 서비스 도메인이 바뀌면 새 origin을 추가한 뒤 `gcloud storage buckets update gs://<bucket-name> --cors-file=storage.cors.json`으로 적용하세요. 기존 버킷 설정이 있다면 먼저 병합해야 합니다. CORS는 Firebase 규칙 배포에 포함되지 않으며, 누락 시 업로드는 성공해도 이미지 조회는 실패할 수 있습니다. [Firebase 다운로드 및 CORS 안내](https://firebase.google.com/docs/storage/web/download-files#cors_configuration)
+- 긴 텍스트는 내부 스크롤을 유지하고 스크롤바만 숨깁니다. Enter는 전송, Shift+Enter는 줄바꿈이며 한글 조합 중 Enter는 전송하지 않습니다.
+
+검증 명령:
+
+```bash
+npm run check
+npm run build
+npx firebase emulators:exec --config firebase.e2e.json --project demo-collezio --only auth,firestore,storage "node --test tests/integration/chat.rules.test.mjs && npx playwright test tests/e2e/chat.spec.ts"
+```
+
+## 채팅 거래 제안
+
+- 구매자(채팅 요청자)가 구매·교환 조건을 제안합니다. 교환은 본인이 등록한 거래 가능한 상품 한 개를 선택하며 추가금과 지급자를 지정할 수 있습니다. 직거래는 약속 시각과 장소, 택배는 발송 예정 시각과 배송비 부담자를 입력합니다.
+- 제안은 `chatRooms/{roomId}/proposals/{proposalId}`에 저장하고 같은 ID의 채팅 메시지로 연결합니다. `trade/state`는 대기 중인 제안과 확정 제안을 가리킵니다. 방마다 대기 중인 제안은 하나이며, 실패 시 같은 요청 ID로 재시도해 중복 전송을 막습니다.
+- 받은 사람은 수락·거절, 보낸 사람은 철회할 수 있습니다. 수락하면 상품 예약과 제안 상태를 한 트랜잭션으로 갱신합니다. 다른 방에서 예약한 상품이나 차단된 상대와의 수락은 거부합니다. 교환은 양쪽 상품을 함께 예약합니다.
+- 확정 후에는 양쪽 모두 조건 변경을 제안할 수 있습니다. 교환 상품 변경은 해당 상품 소유자인 채팅 요청자만 UI에서 선택합니다. 변경 제안이 대기·거절·철회 상태일 때 기존 조건과 예약은 유지합니다. 수락하면 이전 제안을 `superseded`로 남기고, 교체된 교환 상품 예약을 해제합니다.
+- 입력 중인 조건은 해당 탭의 세션 저장소에 보관합니다. 상품 등록은 새 탭에서 열고 돌아온 뒤 목록을 새로고침할 수 있습니다. 결제, 배송 추적, 거래 완료·확정 거래 취소는 별도 기능입니다.
+- 앱 반영 전에 `npx firebase deploy --only firestore:rules --project <project-id>`로 규칙을 배포해야 합니다. 에뮬레이터 테스트 성공은 운영 규칙 배포를 의미하지 않습니다.
+- 검증: `npm run test:unit`, 위의 채팅 통합 테스트 및 E2E 명령을 실행합니다. 구매 수락·조건 변경 거절, 교환 상품 교체, 동시 응답, 다른 채팅의 예약 충돌과 모바일 크기 모달을 검증합니다. 실제 휴대폰 검증과 모바일 뷰포트 검증은 구분합니다.
+
 ## Getting Started
 
 First, run the development server:

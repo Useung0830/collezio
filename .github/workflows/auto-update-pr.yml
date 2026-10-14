@@ -1,0 +1,98 @@
+name: Update PR Branches
+
+on:
+  push:
+    branches: [dev]
+  workflow_run:
+    workflows: [CI, Auto Merge]
+    types: [completed]
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: update-dev-pull-requests
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Update branches and request CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # This privileged job only uses API metadata. Never check out PR code.
+      - uses: actions/github-script@v9
+        with:
+          script: |
+            const repo = context.repo;
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
+              ...repo, state: "open", base: "dev", per_page: 100,
+            });
+            for (const item of pullRequests) {
+              try {
+                let { data: pr } = await github.rest.pulls.get({
+                  ...repo, pull_number: item.number,
+                });
+                if (pr.state !== "open" || pr.draft || !pr.auto_merge ||
+                    pr.base.ref !== "dev" ||
+                    pr.head.repo?.full_name !== `${repo.owner}/${repo.repo}` ||
+                    ["dev", "main"].includes(pr.head.ref)) continue;
+
+                const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+                  ...repo, basehead: `dev...${pr.head.sha}`,
+                });
+                if (comparison.behind_by > 0) {
+                  if (pr.mergeable === false) {
+                    core.warning(`PR #${pr.number}: resolve conflicts manually.`);
+                    continue;
+                  }
+                  const previousSha = pr.head.sha;
+                  await github.rest.pulls.updateBranch({
+                    ...repo, pull_number: pr.number, expected_head_sha: previousSha,
+                  });
+                  // updateBranch is asynchronous; do not dispatch CI for the old head.
+                  for (let attempt = 0; attempt < 10; attempt++) {
+                    await new Promise((resolve) => setTimeout(resolve, 2000));
+                    ({ data: pr } = await github.rest.pulls.get({
+                      ...repo, pull_number: item.number,
+                    }));
+                    if (pr.head.sha !== previousSha) break;
+                  }
+                  if (pr.head.sha === previousSha) {
+                    core.warning(`PR #${pr.number}: update pending; a later run will retry.`);
+                    continue;
+                  }
+                  core.info(`Updated PR #${pr.number} with dev.`);
+                }
+
+                if (pr.state !== "open" || pr.draft || !pr.auto_merge ||
+                    pr.base.ref !== "dev") continue;
+                const { data: latest } = await github.rest.repos.compareCommitsWithBasehead({
+                  ...repo, basehead: `dev...${pr.head.sha}`,
+                });
+                if (latest.behind_by > 0) continue;
+
+                // Explicit dispatch works with GITHUB_TOKEN. Also recover when an
+                // earlier update succeeded but its CI dispatch failed.
+                const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                  ...repo, workflow_id: "ci.yml", branch: pr.head.ref,
+                  head_sha: pr.head.sha, event: "workflow_dispatch", per_page: 1,
+                });
+                if (runs.total_count > 0) continue;
+                await github.rest.actions.createWorkflowDispatch({
+                  ...repo, workflow_id: "ci.yml", ref: pr.head.ref,
+                });
+                core.info(`Requested CI for PR #${pr.number} at ${pr.head.sha}.`);
+              } catch (error) {
+                if ([409, 422].includes(error.status)) {
+                  core.warning(`PR #${item.number}: update refused (conflict or changed head); retry after resolution.`);
+                  continue;
+                }
+                core.setFailed(`PR #${item.number}: ${error.message}`);
+              }
+            }

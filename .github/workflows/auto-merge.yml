@@ -1,0 +1,63 @@
+name: Auto Merge
+
+on:
+  pull_request_target:
+    branches: [dev, main]
+    types:
+      [
+        opened,
+        reopened,
+        synchronize,
+        ready_for_review,
+        converted_to_draft,
+        edited,
+      ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    name: Configure Auto Merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Keep this privileged workflow metadata-only: never check out PR code.
+      - name: Configure PR auto-merge
+        uses: actions/github-script@v9
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const { data: pullRequest } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+
+            if (
+              pullRequest.state !== "open" ||
+              pullRequest.head.repo?.full_name !== pullRequest.base.repo.full_name
+            ) {
+              return;
+            }
+
+            const shouldAutoMerge =
+              pullRequest.base.ref === "dev" && !pullRequest.draft;
+
+            if (!shouldAutoMerge) {
+              if (pullRequest.auto_merge) {
+                await exec.exec("gh", ["pr", "merge", pullRequest.html_url, "--disable-auto"]);
+              }
+              return;
+            }
+
+            await exec.exec("gh", [
+              "pr", "merge", pullRequest.html_url,
+              "--auto", "--squash",
+              "--match-head-commit", pullRequest.head.sha,
+            ]);

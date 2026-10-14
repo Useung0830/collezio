@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-toastify/dist/ReactToastify.css" layer(base);
 @import "../styles/typography.css";
 
 @theme {
@@ -15,7 +16,8 @@
   --color-white: #ffffff;
 
   --color-brand-blue: #515ff4;
-  --color-brand-green: #82d917;
+  --color-brand-green: #7dd313;
+  --color-brand-green-dark: #008a00;
 }
 
 *,

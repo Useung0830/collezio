@@ -1,0 +1,619 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isActiveUser() {
+      return request.auth != null && !exists(/databases/$(database)/documents/withdrawalRequests/$(request.auth.uid));
+    }
+    match /withdrawalRequests/{userId} {
+      allow get: if request.auth != null && request.auth.uid == userId;
+    }
+    function canChat(firstId, secondId) {
+      return !exists(/databases/$(database)/documents/withdrawalRequests/$(firstId))
+        && !exists(/databases/$(database)/documents/withdrawalRequests/$(secondId))
+        && !existsAfter(/databases/$(database)/documents/users/$(firstId)/chatBlocks/$(secondId))
+        && !existsAfter(/databases/$(database)/documents/users/$(secondId)/chatBlocks/$(firstId));
+    }
+    match /users/{userId}/chatBlocks/{partnerId} {
+      // 상대방은 자신과의 차단 여부만 조회할 수 있고 전체 목록은 읽을 수 없습니다.
+      allow get: if isActiveUser() && request.auth.uid in [userId, partnerId];
+      allow list: if isActiveUser() && request.auth.uid == userId;
+      allow create: if isActiveUser() && request.auth.uid == userId && userId != partnerId
+        && request.resource.data.keys().hasAll(['createdAt'])
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isActiveUser() && request.auth.uid == userId;
+    }
+    match /users/{userId}/chatReports/{reportId} {
+      function isValidReport() {
+        let data = request.resource.data;
+        let room = get(/databases/$(database)/documents/chatRooms/$(data.roomId)).data;
+        return data.keys().hasAll(['partnerId', 'roomId', 'reason', 'details', 'createdAt'])
+          && data.keys().hasOnly(['partnerId', 'roomId', 'reason', 'details', 'createdAt'])
+          && data.roomId is string && data.partnerId is string
+          && request.auth.uid in room.visibleTo && userId != data.partnerId
+          && ((room.requesterId == userId && room.sellerId == data.partnerId)
+            || (room.sellerId == userId && room.requesterId == data.partnerId))
+          && data.reason in ['스팸·광고', '사기 의심', '욕설·괴롭힘', '부적절한 콘텐츠', '기타']
+          && data.details is string && data.details.size() <= 1000
+          && (data.reason != '기타' || data.details.matches('(?s).*\\S.*'))
+          && data.createdAt == request.time;
+      }
+      allow get: if isActiveUser() && request.auth.uid == userId;
+      allow create: if isActiveUser() && request.auth.uid == userId && isValidReport();
+    }
+    function isCommunityOwner(authorId) {
+      return isActiveUser() && request.auth.uid == authorId;
+    }
+    function isCommunityText(value, maximum) {
+      return value is string && value.size() > 0 && value.size() <= maximum
+        && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+    function canCleanCommunityPost(postId) {
+      return isActiveUser()
+        && get(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == request.auth.uid;
+    }
+    match /communityPostDeletions/{postId} {
+      allow get: if isActiveUser() && (!exists(/databases/$(database)/documents/communityPostDeletions/$(postId)) || isCommunityOwner(resource.data.authorId));
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && request.resource.data.keys().hasAll(['authorId', 'images', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['authorId', 'images', 'createdAt'])
+        && request.resource.data.authorId == get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId
+        && request.resource.data.images == get(/databases/$(database)/documents/communityPosts/$(postId)).data.images
+        && request.resource.data.createdAt == request.time
+        && !existsAfter(/databases/$(database)/documents/communityPosts/$(postId));
+      allow delete: if isCommunityOwner(resource.data.authorId);
+    }
+    match /communityPosts/{postId} {
+      function isValidCommunityImage(image, authorId) {
+        return image.keys().hasOnly(['path', 'url'])
+          && image.path.matches('community/' + authorId + '/' + postId + '/[a-zA-Z0-9-]{1,64}')
+          && image.url.size() <= 2048
+          && image.url.matches('https://firebasestorage[.]googleapis[.]com/v0/b/[a-zA-Z0-9.-]+/o/'
+            + image.path.replace('/', '%2F') + '[?]alt=media(&token=[a-zA-Z0-9-]+)?');
+      }
+      function isValidCommunityImageAt(images, index, authorId) {
+        return images.size() <= index || isValidCommunityImage(images[index], authorId);
+      }
+      function isValidCommunityImages(images, authorId) {
+        return images is list && images.size() <= 10
+          && authorId.matches('[a-zA-Z0-9_-]{1,128}') && postId.matches('[a-zA-Z0-9_-]{1,128}')
+          && isValidCommunityImageAt(images, 0, authorId) && isValidCommunityImageAt(images, 1, authorId)
+          && isValidCommunityImageAt(images, 2, authorId) && isValidCommunityImageAt(images, 3, authorId)
+          && isValidCommunityImageAt(images, 4, authorId) && isValidCommunityImageAt(images, 5, authorId)
+          && isValidCommunityImageAt(images, 6, authorId) && isValidCommunityImageAt(images, 7, authorId)
+          && isValidCommunityImageAt(images, 8, authorId) && isValidCommunityImageAt(images, 9, authorId);
+      }
+      function isValidPost(data) {
+        return data.keys().hasAll(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && data.keys().hasOnly(['authorId', 'title', 'content', 'images', 'createdAt', 'updatedAt', 'likeCount', 'viewCount'])
+          && isCommunityText(data.title, 100) && isCommunityText(data.content, 5000)
+          && isValidCommunityImages(data.images, data.authorId);
+      }
+      function isLikeChange() {
+        let path = /databases/$(database)/documents/communityPosts/$(postId)/likes/$(request.auth.uid);
+        let before = resource.data.likeCount;
+        let after = request.resource.data.likeCount;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount'])
+          && after is int && after >= 0 && after <= 9007199254740991
+          && ((!exists(path) && existsAfter(path) && after == before + 1)
+            || (exists(path) && !existsAfter(path) && after == before - 1));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && !exists(/databases/$(database)/documents/communityPostDeletions/$(postId))
+        && isValidPost(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.likeCount is int && request.resource.data.likeCount == 0
+        && request.resource.data.viewCount is int && request.resource.data.viewCount == 0;
+      allow update: if isActiveUser() && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.authorId)) && (
+        (isCommunityOwner(resource.data.authorId)
+          && isValidPost(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'images', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time)
+        || isLikeChange());
+      allow delete: if isCommunityOwner(resource.data.authorId)
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.authorId == resource.data.authorId
+        && getAfter(/databases/$(database)/documents/communityPostDeletions/$(postId)).data.images == resource.data.images;
+
+      match /likes/{userId} {
+        function hasCountChange(delta) {
+          let path = /databases/$(database)/documents/communityPosts/$(postId);
+          return getAfter(path).data.likeCount == get(path).data.likeCount + delta;
+        }
+        allow get: if isCommunityOwner(userId);
+        allow list: if canCleanCommunityPost(postId);
+        allow create: if isCommunityOwner(userId)
+          && get(/databases/$(database)/documents/communityPosts/$(postId)).data.authorId != userId
+          && request.resource.data.keys().hasAll(['createdAt'])
+          && request.resource.data.keys().hasOnly(['createdAt'])
+          && request.resource.data.createdAt == request.time && hasCountChange(1);
+        allow delete: if (isCommunityOwner(userId) && hasCountChange(-1)) || canCleanCommunityPost(postId);
+      }
+    }
+    match /communityComments/{commentId} {
+      function isValidComment(data) {
+        return data.keys().hasAll(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.keys().hasOnly(['postId', 'authorId', 'content', 'createdAt', 'updatedAt'])
+          && data.postId is string && data.postId.size() > 0
+          && !data.postId.matches('.*[/].*')
+          && isCommunityText(data.content, 1000)
+          && existsAfter(/databases/$(database)/documents/communityPosts/$(data.postId))
+          && !exists(/databases/$(database)/documents/withdrawalRequests/$(get(/databases/$(database)/documents/communityPosts/$(data.postId)).data.authorId));
+      }
+      allow read: if true;
+      allow create: if isCommunityOwner(request.resource.data.authorId)
+        && isValidComment(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isCommunityOwner(resource.data.authorId)
+        && request.time < resource.data.createdAt + duration.value(5, 'm')
+        && isValidComment(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isCommunityOwner(resource.data.authorId) || canCleanCommunityPost(resource.data.postId);
+    }
+    match /users/{userId}/productChats/{productId} {
+      function isOwner() {
+        return isActiveUser() && request.auth.uid == userId;
+      }
+      function isValidLink() {
+        let data = request.resource.data;
+        let roomPath = /databases/$(database)/documents/chatRooms/$(data.roomId);
+        let room = getAfter(roomPath).data;
+        return data.keys().hasAll(['roomId']) && data.keys().hasOnly(['roomId'])
+          && data.roomId is string && data.roomId.matches('^[A-Za-z0-9]{20}$')
+          && !exists(roomPath)
+          && room.requesterId == userId && room.productId == productId;
+      }
+      allow get: if isOwner();
+      allow create: if isOwner() && isValidLink();
+    }
+
+    match /chatRooms/{roomId} {
+      function tradeRoom() { return get(/databases/$(database)/documents/chatRooms/$(roomId)).data; }
+      function tradeMember() { return request.auth != null && request.auth.uid in tradeRoom().visibleTo; }
+      function tradeState() {
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        return exists(path) ? get(path).data : {'pendingId': null, 'acceptedId': null};
+      }
+      function tradeStateAfter() { return getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/trade/state).data; }
+      function completionBefore(proposalId) {
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId);
+        return exists(path) ? get(path).data : {'confirmedBy': [], 'deferredBy': [], 'reviewedBy': []};
+      }
+      function isTradeCompleted() {
+        return tradeState().acceptedId != null && completionBefore(tradeState().acceptedId).confirmedBy.size() == 2;
+      }
+      function availableForTrade(productId, ownerId) {
+        let product = get(/databases/$(database)/documents/products/$(productId)).data;
+        return product.sellerId == ownerId && (product.status == 'available' || (product.status == 'reserved' && product.get('reservedByRoomId', null) == roomId));
+      }
+      function validTradeTerms(t) {
+        return t.keys().hasAll(['kind', 'amount', 'exchangeProductId', 'extraAmount', 'extraPayer', 'method', 'scheduledAt', 'location', 'shippingPayer', 'notes'])
+          && t.keys().hasOnly(['kind', 'amount', 'exchangeProductId', 'extraAmount', 'extraPayer', 'method', 'scheduledAt', 'location', 'shippingPayer', 'notes'])
+          && t.amount is int && t.amount >= 0 && t.amount <= 1000000000
+          && t.extraAmount is int && t.extraAmount >= 0 && t.extraAmount <= 1000000000
+          && ((t.extraAmount == 0 && t.extraPayer == 'none') || (t.extraAmount > 0 && t.extraPayer in ['requester', 'seller']))
+          && t.scheduledAt is int && t.scheduledAt > request.time.toMillis() && t.scheduledAt <= request.time.toMillis() + 31622400000
+          && t.location is string && t.location.size() <= 200 && t.notes is string && t.notes.size() <= 1000
+          && t.method in ['direct', 'parcel'] && (t.method == 'parcel' || t.location.matches('(?s).*\\S.*'))
+          && t.shippingPayer in ['requester', 'seller', 'each']
+          && ((t.kind == 'sale' && t.exchangeProductId == null && t.extraAmount == 0 && t.extraPayer == 'none')
+            || (t.kind == 'exchange' && t.amount == 0 && t.exchangeProductId is string && t.exchangeProductId.matches('^[a-zA-Z0-9-]{1,128}$')));
+      }
+      function reservedAfter(productId, ownerId) {
+        let product = getAfter(/databases/$(database)/documents/products/$(productId)).data;
+        return product.status == 'reserved' && product.reservedByRoomId == roomId && product.sellerId == ownerId;
+      }
+      function validTradeAcceptance(data) {
+        return request.auth.uid == data.recipientId && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && data.previousId == tradeState().acceptedId && data.terms.scheduledAt > request.time.toMillis()
+          && (data.previousId == null || getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(data.previousId)).data.status == 'superseded')
+          && reservedAfter(data.productId, tradeRoom().sellerId)
+          && (data.terms.kind == 'sale' || reservedAfter(data.terms.exchangeProductId, tradeRoom().requesterId));
+      }
+      function validSuperseded(previous, proposalId) {
+        let next = getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(tradeStateAfter().acceptedId)).data;
+        return previous.status == 'accepted' && tradeState().acceptedId == proposalId
+          && next.previousId == proposalId && next.status == 'accepted' && next.recipientId == request.auth.uid
+          && (previous.terms.exchangeProductId == null || previous.terms.exchangeProductId == next.terms.exchangeProductId
+            || (getAfter(/databases/$(database)/documents/products/$(previous.terms.exchangeProductId)).data.status == 'available'
+              && getAfter(/databases/$(database)/documents/products/$(previous.terms.exchangeProductId)).data.reservedByRoomId == null));
+      }
+      match /proposals/{proposalId} {
+        allow read: if tradeMember();
+        allow update: if tradeMember() && request.resource.data.status == 'superseded'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time && validSuperseded(resource.data, proposalId);
+        allow update: if tradeMember()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+          && request.resource.data.updatedAt == request.time && resource.data.status == 'pending'
+          && tradeState().pendingId == proposalId && tradeStateAfter().pendingId == null
+          && ((request.resource.data.status == 'accepted' && validTradeAcceptance(resource.data) && tradeStateAfter().acceptedId == proposalId)
+            || (tradeStateAfter().acceptedId == tradeState().acceptedId
+              && ((request.resource.data.status == 'rejected' && request.auth.uid == resource.data.recipientId)
+                || (request.resource.data.status == 'withdrawn' && request.auth.uid == resource.data.senderId))));
+        allow create: if tradeMember() && !isTradeCompleted()
+          && request.resource.data.keys().hasAll(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
+          && request.resource.data.keys().hasOnly(['senderId', 'recipientId', 'productId', 'previousId', 'terms', 'status', 'createdAt', 'updatedAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.recipientId == (request.auth.uid == tradeRoom().requesterId ? tradeRoom().sellerId : tradeRoom().requesterId)
+          && request.resource.data.productId == tradeRoom().productId
+          && request.resource.data.status == 'pending' && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+          && validTradeTerms(request.resource.data.terms)
+          && request.resource.data.terms.kind == get(/databases/$(database)/documents/products/$(tradeRoom().productId)).data.transaction.type
+          && availableForTrade(tradeRoom().productId, tradeRoom().sellerId)
+          && (request.resource.data.terms.kind == 'sale' || availableForTrade(request.resource.data.terms.exchangeProductId, tradeRoom().requesterId))
+          && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && tradeState().pendingId == null && request.resource.data.previousId == tradeState().acceptedId
+          && (request.resource.data.previousId != null || request.auth.uid == tradeRoom().requesterId)
+          && tradeStateAfter().pendingId == proposalId && tradeStateAfter().acceptedId == tradeState().acceptedId
+          && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/messages/$(proposalId)).data.proposalId == proposalId;
+      }
+      match /trade/{stateId} {
+        allow read: if stateId == 'state' && tradeMember();
+        allow create, update: if stateId == 'state' && tradeMember()
+          && request.resource.data.keys().hasAll(['pendingId', 'acceptedId']) && request.resource.data.keys().hasOnly(['pendingId', 'acceptedId'])
+          && tradeState().pendingId == null && request.resource.data.pendingId is string
+          && request.resource.data.acceptedId == tradeState().acceptedId
+          && !exists(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId))
+          && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(request.resource.data.pendingId)).data.status == 'pending';
+        allow update: if stateId == 'state' && tradeMember()
+          && request.resource.data.keys().hasAll(['pendingId', 'acceptedId']) && request.resource.data.keys().hasOnly(['pendingId', 'acceptedId'])
+          && resource.data.pendingId is string && request.resource.data.pendingId == null
+          && get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'pending'
+          && ((getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status == 'accepted' && request.resource.data.acceptedId == resource.data.pendingId)
+            || (getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(resource.data.pendingId)).data.status in ['rejected', 'withdrawn'] && request.resource.data.acceptedId == resource.data.acceptedId));
+      }
+      match /completions/{proposalId} {
+        function members() { return [tradeRoom().requesterId, tradeRoom().sellerId]; }
+        function validList(value) {
+          return value is list && value.size() <= 2 && value.toSet().size() == value.size() && value.hasOnly(members());
+        }
+        function validCompletion() {
+          let data = request.resource.data;
+          return data.keys().hasAll(['confirmedBy', 'deferredBy', 'reviewedBy', 'updatedAt'])
+            && data.keys().hasOnly(['confirmedBy', 'deferredBy', 'reviewedBy', 'updatedAt'])
+            && validList(data.confirmedBy) && validList(data.deferredBy) && validList(data.reviewedBy)
+            && data.updatedAt == request.time;
+        }
+        function completedProduct(productId) {
+          let product = getAfter(/databases/$(database)/documents/products/$(productId)).data;
+          return product.status == 'completed' && product.reservedByRoomId == roomId;
+        }
+        function validResponse() {
+          let before = completionBefore(proposalId);
+          let after = request.resource.data;
+          let proposal = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId)).data;
+          let uid = request.auth.uid;
+          return tradeState().acceptedId == proposalId && tradeState().pendingId == null
+            && proposal.status == 'accepted' && proposal.terms.scheduledAt <= request.time.toMillis()
+            && !(uid in before.confirmedBy) && after.reviewedBy == before.reviewedBy
+            && ((after.confirmedBy == before.confirmedBy.concat([uid]) && after.deferredBy == before.deferredBy.removeAll([uid]))
+              || (after.confirmedBy == before.confirmedBy && after.deferredBy.toSet() == before.deferredBy.toSet().union([uid].toSet())))
+            && (after.confirmedBy.size() < 2 || (completedProduct(proposal.productId)
+              && (proposal.terms.exchangeProductId == null || completedProduct(proposal.terms.exchangeProductId))));
+        }
+        function validReviewSubmission() {
+          let before = resource.data;
+          let after = request.resource.data;
+          let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId)/reviews/$(request.auth.uid);
+          return before.confirmedBy.hasAll(members()) && !(request.auth.uid in before.reviewedBy)
+            && after.confirmedBy == before.confirmedBy && after.deferredBy == before.deferredBy
+            && after.reviewedBy == before.reviewedBy.concat([request.auth.uid])
+            && !exists(path) && getAfter(path).data.createdAt == request.time;
+        }
+        allow read: if tradeMember();
+        allow create, update: if tradeMember() && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && validCompletion() && validResponse();
+        allow update: if tradeMember() && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+          && validCompletion() && validReviewSubmission();
+
+        match /reviews/{authorId} {
+          function completion() { return completionBefore(proposalId); }
+          allow get: if tradeMember() && (authorId == request.auth.uid || completion().reviewedBy.hasAll(members()));
+          allow create: if tradeMember() && authorId == request.auth.uid
+            && canChat(tradeRoom().requesterId, tradeRoom().sellerId)
+            && completion().confirmedBy.hasAll(members())
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/completions/$(proposalId)).data.reviewedBy.hasAll([authorId])
+            && request.resource.data.keys().hasAll(['rating', 'content', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['rating', 'content', 'createdAt'])
+            && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+            && request.resource.data.content is string && request.resource.data.content.size() <= 1000
+            && request.resource.data.content.matches('(?s).*\\S.*') && request.resource.data.createdAt == request.time;
+        }
+      }
+      match /imageUploads/{messageId} {
+        function canUpload() {
+          let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+          return request.auth != null && request.auth.uid in room.visibleTo
+            && canChat(room.requesterId, room.sellerId);
+        }
+        allow get: if request.auth != null
+          && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.visibleTo;
+        allow create, update: if canUpload()
+          && request.resource.data.keys().hasAll(['senderId', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['senderId', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.createdAt == request.time
+          && messageId.matches('^[a-zA-Z0-9-]+-0$') && messageId.size() <= 128
+          && !exists(/databases/$(database)/documents/chatRooms/$(roomId)/messages/$(messageId))
+          && (!exists(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId))
+            || resource.data.senderId == request.auth.uid);
+      }
+      function isValidMessage(data, messageId) {
+        return data.keys().hasAll(['content', 'senderId', 'createdAt'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId', 'proposalId'])
+          && (!('proposalId' in data) || (data.proposalId == messageId && !('imagePath' in data) && !('imagePaths' in data) && !('previousMessageId' in data)
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(messageId)).data.senderId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(messageId)).data.createdAt == request.time))
+          && data.content is string && data.content.size() > 0 && data.content.size() <= 2000
+          && data.content.matches('(?s).*\\S.*')
+          && data.senderId == request.auth.uid && data.createdAt == request.time
+          && (!('imagePath' in data) || (data.content == '사진'
+            && !('previousMessageId' in data) && !('imagePaths' in data)
+            && messageId.matches('^[a-zA-Z0-9-]+-0$')
+            && data.imagePath == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId
+            && get(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId)).data.senderId == request.auth.uid))
+          && (!('imagePaths' in data) || (isImagePayload(data, messageId)
+            && get(/databases/$(database)/documents/chatRooms/$(roomId)/imageUploads/$(messageId)).data.senderId == request.auth.uid))
+          && (!('previousMessageId' in data) || hasPreviousImage(data, messageId));
+      }
+      function hasPreviousImage(data, messageId) {
+        // Each new message validates its payload in its own create rule.
+        // Only validate the atomic link here to stay within expression limits.
+        let imageId = data.previousMessageId;
+        let imagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(imageId);
+        let image = getAfter(imagePath).data;
+        return imageId is string && imageId.matches('^[a-zA-Z0-9-]+-0$')
+          && messageId == imageId.replace('-0$', '-1')
+          && !exists(imagePath) && ('imagePath' in image || 'imagePaths' in image)
+          && image.createdAt == data.createdAt && image.senderId == data.senderId;
+      }
+      function validImageAt(paths, messageId, index) {
+        return paths.size() <= index || paths[index] == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId + '/' + string(index);
+      }
+      function validImagePaths(paths, messageId) {
+        return paths is list && paths.size() >= 1 && paths.size() <= 10
+          && validImageAt(paths, messageId, 0) && validImageAt(paths, messageId, 1)
+          && validImageAt(paths, messageId, 2) && validImageAt(paths, messageId, 3)
+          && validImageAt(paths, messageId, 4) && validImageAt(paths, messageId, 5)
+          && validImageAt(paths, messageId, 6) && validImageAt(paths, messageId, 7)
+          && validImageAt(paths, messageId, 8) && validImageAt(paths, messageId, 9);
+      }
+      function isImagePayload(data, messageId) {
+        return data.keys().hasAll(['content', 'senderId', 'createdAt'])
+          && data.keys().hasOnly(['content', 'senderId', 'createdAt', 'imagePath', 'imagePaths'])
+          && data.content == '사진' && data.senderId == request.auth.uid
+          && data.createdAt == request.time
+          && messageId.matches('^[a-zA-Z0-9-]+-0$')
+          && ((('imagePath' in data) && !('imagePaths' in data) && data.imagePath == 'chat/' + roomId + '/' + request.auth.uid + '/' + messageId)
+            || (!('imagePath' in data) && ('imagePaths' in data) && validImagePaths(data.imagePaths, messageId)));
+      }
+      function hasNewMessage() {
+        // The referenced document must be new, so its create rule validates it.
+        let summary = request.resource.data.lastMessage;
+        let messagePath = /databases/$(database)/documents/chatRooms/$(roomId)/messages/$(summary.id);
+        let message = getAfter(messagePath).data;
+        return summary.keys().hasAll(['id', 'content', 'senderId', 'createdAt'])
+          && summary.keys().hasOnly(['id', 'content', 'senderId', 'createdAt', 'imagePath', 'imagePaths', 'previousMessageId', 'proposalId'])
+          && summary.get('proposalId', null) == message.get('proposalId', null)
+          && summary.id is string && summary.id.size() > 0 && summary.id.size() <= 128
+          && !exists(messagePath)
+          && summary.content == message.content && summary.senderId == message.senderId
+          && summary.createdAt == message.createdAt
+          && summary.get('imagePath', null) == message.get('imagePath', null)
+          && summary.get('imagePaths', null) == message.get('imagePaths', null)
+          && summary.get('previousMessageId', null) == message.get('previousMessageId', null);
+      }
+      function hasChatCountIncrement() {
+        let productPath = /databases/$(database)/documents/products/$(resource.data.productId);
+        let before = get(productPath).data.get('chatCount', 0);
+        let after = getAfter(productPath).data.chatCount;
+        return before is int && before >= 0 && after is int && after == before + 1
+          && after <= 9007199254740991;
+      }
+      function isValidMessageUpdate() {
+        return request.auth.uid in resource.data.visibleTo
+          && canChat(resource.data.requesterId, resource.data.sellerId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'visibleTo', 'lastMessage'])
+          && request.resource.data.status == 'active'
+          && request.resource.data.visibleTo == [resource.data.requesterId, resource.data.sellerId]
+          && hasNewMessage()
+          && ((resource.data.status == 'draft' && request.auth.uid == resource.data.requesterId && hasChatCountIncrement())
+            || resource.data.status == 'active');
+      }
+      function isValidDraft() {
+        let data = request.resource.data;
+        let productPath = /databases/$(database)/documents/products/$(data.productId);
+        let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(data.productId);
+        return data.keys().hasAll(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && data.keys().hasOnly(['productId', 'sellerId', 'requesterId', 'status', 'visibleTo', 'createdAt'])
+          && roomId.matches('^[A-Za-z0-9]{20}$')
+          && data.productId is string && data.productId.size() > 0 && data.productId.size() <= 1500
+          && data.productId.matches('^[^/]+$')
+          && data.requesterId == request.auth.uid
+          && data.sellerId is string && data.sellerId != request.auth.uid
+          && data.sellerId == get(productPath).data.sellerId
+          && canChat(data.requesterId, data.sellerId)
+          && data.status == 'draft' && data.visibleTo == [request.auth.uid]
+          && data.createdAt == request.time
+          && !exists(linkPath) && getAfter(linkPath).data.roomId == roomId;
+      }
+      // 상대방은 첫 메시지 전송 전에는 목록뿐 아니라 직접 조회도 할 수 없습니다.
+      allow read: if isActiveUser() && request.auth.uid in resource.data.visibleTo;
+      allow create: if isActiveUser() && isValidDraft();
+      allow update: if isActiveUser() && isValidMessageUpdate();
+
+      match /messages/{messageId} {
+        function canAccessRoom() {
+          return isActiveUser()
+            && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(roomId)).data.visibleTo;
+        }
+        function matchesRoomSummary() {
+          let room = getAfter(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+          let data = request.resource.data;
+          return canChat(room.requesterId, room.sellerId)
+            && room.status == 'active' && room.lastMessage.senderId == data.senderId
+            && room.lastMessage.createdAt == data.createdAt
+            && ((room.lastMessage.id == messageId
+              && room.lastMessage.content == data.content
+              && room.lastMessage.get('proposalId', null) == data.get('proposalId', null)
+              && room.lastMessage.get('imagePath', null) == data.get('imagePath', null)
+              && room.lastMessage.get('imagePaths', null) == data.get('imagePaths', null)
+              && room.lastMessage.get('previousMessageId', null) == data.get('previousMessageId', null))
+              || (room.lastMessage.get('previousMessageId', null) == messageId
+                && ('imagePath' in data || 'imagePaths' in data)
+                && hasPreviousImage(room.lastMessage, room.lastMessage.id)));
+        }
+        allow read: if canAccessRoom();
+        allow create: if canAccessRoom() && messageId.size() > 0 && messageId.size() <= 128
+          && isValidMessage(request.resource.data, messageId) && matchesRoomSummary();
+      }
+    }
+
+    // 닉네임 중복 방지를 위해 생성·수정은 saveProfile 함수에서만 처리합니다.
+    match /profiles/{userId} {
+      allow get: if true;
+    }
+
+    match /users/{userId}/favorites/{productId} {
+      function isOwner() {
+        return isActiveUser() && request.auth.uid == userId;
+      }
+      function hasCountChange(delta) {
+        let productPath = /databases/$(database)/documents/products/$(productId);
+        let before = get(productPath).data.get('favoriteCount', 0);
+        let after = getAfter(productPath).data.favoriteCount;
+        return before is int && before >= 0
+          && after is int && after >= 0 && after <= 9007199254740991
+          && after == before + delta;
+      }
+      allow read: if isOwner();
+      allow create: if isOwner()
+        && request.resource.data.keys().hasAll(['createdAt'])
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time
+        && hasCountChange(1);
+      allow delete: if isOwner() && hasCountChange(-1);
+    }
+
+    match /products/{productId} {
+      function isTradeCompletion() {
+        let roomId = resource.data.reservedByRoomId;
+        let room = get(/databases/$(database)/documents/chatRooms/$(roomId)).data;
+        let state = get(/databases/$(database)/documents/chatRooms/$(roomId)/trade/state).data;
+        let proposal = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(state.acceptedId)).data;
+        let path = /databases/$(database)/documents/chatRooms/$(roomId)/completions/$(state.acceptedId);
+        return request.auth.uid in [room.requesterId, room.sellerId]
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && resource.data.status == 'reserved' && request.resource.data.status == 'completed'
+          && get(path).data.confirmedBy.size() == 1
+          && getAfter(path).data.confirmedBy.hasAll([room.requesterId, room.sellerId])
+          && (productId == proposal.productId || productId == proposal.terms.exchangeProductId);
+      }
+      function isTradeReservation() {
+        let roomId = request.resource.data.reservedByRoomId;
+        let statePath = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        let proposalId = getAfter(statePath).data.acceptedId;
+        let proposalPath = /databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId);
+        let proposal = getAfter(proposalPath).data;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedByRoomId'])
+          && (resource.data.status == 'available' || (resource.data.status == 'reserved' && resource.data.get('reservedByRoomId', null) == roomId)) && request.resource.data.status == 'reserved'
+          && get(statePath).data.pendingId == proposalId && getAfter(statePath).data.pendingId == null
+          && get(proposalPath).data.status == 'pending' && proposal.status == 'accepted'
+          && proposal.recipientId == request.auth.uid
+          && (proposal.productId == productId || proposal.terms.exchangeProductId == productId);
+      }
+      function isTradeRelease() {
+        let roomId = resource.data.reservedByRoomId;
+        let statePath = /databases/$(database)/documents/chatRooms/$(roomId)/trade/state;
+        let proposalId = getAfter(statePath).data.acceptedId;
+        let proposalPath = /databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposalId);
+        let proposal = getAfter(proposalPath).data;
+        let previous = get(/databases/$(database)/documents/chatRooms/$(roomId)/proposals/$(proposal.previousId)).data;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedByRoomId'])
+          && resource.data.status == 'reserved' && request.resource.data.status == 'available' && request.resource.data.reservedByRoomId == null
+          && get(statePath).data.pendingId == proposalId && get(proposalPath).data.status == 'pending' && proposal.status == 'accepted'
+          && proposal.recipientId == request.auth.uid && previous.terms.exchangeProductId == productId && proposal.terms.exchangeProductId != productId;
+      }
+      function isValidChatCountChange() {
+        let linkPath = /databases/$(database)/documents/users/$(request.auth.uid)/productChats/$(productId);
+        let roomPath = /databases/$(database)/documents/chatRooms/$(get(linkPath).data.roomId);
+        let roomBefore = get(roomPath).data;
+        let roomAfter = getAfter(roomPath).data;
+        let before = resource.data.get('chatCount', 0);
+        let after = request.resource.data.chatCount;
+        return roomBefore.productId == productId && roomBefore.requesterId == request.auth.uid
+          && roomBefore.sellerId == resource.data.sellerId
+          && roomBefore.status == 'draft' && roomAfter.status == 'active'
+          && before is int && before >= 0 && after is int && after == before + 1
+          && after <= 9007199254740991;
+      }
+      function isValidFavoriteChange() {
+        let favoritePath = /databases/$(database)/documents/users/$(request.auth.uid)/favorites/$(productId);
+        let before = resource.data.get('favoriteCount', 0);
+        let after = request.resource.data.favoriteCount;
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount'])
+          && before is int && before >= 0
+          && after is int && after >= 0 && after <= 9007199254740991
+          && ((!exists(favoritePath) && existsAfter(favoritePath) && after == before + 1)
+            || (exists(favoritePath) && !existsAfter(favoritePath) && after == before - 1));
+      }
+      function isValidProductText(data) {
+        return data.title is string && data.title.size() > 0 && data.title.size() <= 100
+          && data.description is string && data.description.size() > 0 && data.description.size() <= 5000;
+      }
+      function isValidTransaction(transaction) {
+        return transaction is map && (
+          (transaction.type == 'sale' && transaction.keys().hasOnly(['type', 'price'])
+            && transaction.price is int && transaction.price >= 0)
+          || (transaction.type == 'exchange' && transaction.keys().hasOnly(['type', 'desiredItemName'])
+            && transaction.desiredItemName is string && transaction.desiredItemName.size() > 0
+            && transaction.desiredItemName.size() <= 100)
+        );
+      }
+      function isValidDelivery(delivery) {
+        return delivery is map && (
+          (delivery.type == 'direct' && delivery.keys().hasOnly(['type', 'location'])
+            && delivery.location is string && delivery.location.size() > 0 && delivery.location.size() <= 200)
+          || (delivery.type == 'parcel' && delivery.keys().hasOnly(['type', 'shippingFee'])
+            && delivery.shippingFee is int && delivery.shippingFee >= 0)
+        );
+      }
+      function isValidProductFields(data) {
+        let fields = ['title', 'description', 'transaction', 'delivery', 'images', 'sellerId', 'status', 'createdAt'];
+        return data.keys().hasAll(fields)
+          && data.keys().hasOnly(fields.concat(['favoriteCount']))
+          && data.get('favoriteCount', 0) is int
+          && data.get('favoriteCount', 0) == 0;
+      }
+      function isValidImage(image) {
+        return image is map && image.keys().hasAll(['url', 'path']) && image.keys().hasOnly(['url', 'path'])
+          && image.url is string && image.url.size() <= 2048 && image.url.matches('https://.+')
+          && image.path is string && image.path.size() > 0 && image.path.size() <= 1024;
+      }
+      function isValidImageAt(images, index) {
+        return images.size() <= index || isValidImage(images[index]);
+      }
+      function isValidImages(images) {
+        return images is list && images.size() >= 1 && images.size() <= 10
+          && isValidImageAt(images, 0) && isValidImageAt(images, 1)
+          && isValidImageAt(images, 2) && isValidImageAt(images, 3)
+          && isValidImageAt(images, 4) && isValidImageAt(images, 5)
+          && isValidImageAt(images, 6) && isValidImageAt(images, 7)
+          && isValidImageAt(images, 8) && isValidImageAt(images, 9);
+      }
+      allow read: if true;
+      allow update: if isActiveUser()
+        && !exists(/databases/$(database)/documents/withdrawalRequests/$(resource.data.get('sellerId', '__legacy__')))
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favoriteCount']) && isValidFavoriteChange())
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatCount']) && isValidChatCountChange())
+          || isTradeReservation() || isTradeRelease() || isTradeCompletion());
+      // Product creation is atomic with the server registration record.
+      allow create: if false;
+    }
+  }
+}

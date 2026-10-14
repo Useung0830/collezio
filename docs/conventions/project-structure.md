@@ -25,6 +25,10 @@ src/
 │   ├── error.tsx                # 루트 에러 UI
 │   ├── not-found.tsx            # 404 UI
 │   ├── globals.css              # 전역 스타일
+│   ├── (auth)/                  # 인증 화면 라우트 그룹 (URL에는 미포함)
+│   │   ├── login/page.tsx       # 로그인 (/login)
+│   │   ├── signup/page.tsx      # 회원가입 (/signup)
+│   │   └── find-password/page.tsx # 비밀번호 찾기 (/find-password)
 │   ├── products/
 │   │   ├── [productId]/page.tsx # 상품 상세 (/products/:productId)
 │   │   └── new/page.tsx         # 상품 등록 (/products/new)
@@ -35,14 +39,13 @@ src/
 │   ├── chat/
 │   │   ├── page.tsx             # 채팅방 목록 (/chat)
 │   │   └── [chatRoomId]/page.tsx# 채팅방 (/chat/:chatRoomId)
-│   └── my/
+│   └── (my)/                    # 마이페이지 라우트 그룹 (URL에는 미포함)
 │       ├── layout.tsx           # 마이페이지 공통 레이아웃
-│       ├── page.tsx             # 마이페이지 홈 (/my)
-│       ├── collections/page.tsx # 보유 컬렉션
-│       ├── matches/page.tsx     # 매칭 내역
-│       ├── favorites/page.tsx   # 관심 상품
-│       ├── reviews/page.tsx     # 리뷰 내역
-│       └── posts/page.tsx       # 작성 게시글
+│       ├── collections/page.tsx # 보유 컬렉션 (/collections)
+│       ├── matches/page.tsx     # 매칭 내역 (/matches)
+│       ├── favorites/page.tsx   # 관심 상품 (/favorites)
+│       ├── reviews/page.tsx     # 리뷰 내역 (/reviews)
+│       └── posts/page.tsx       # 작성 게시글 (/posts)
 │
 ├── features/                    # 도메인별 기능 모듈
 │   ├── auth/

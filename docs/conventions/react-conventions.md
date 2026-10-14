@@ -36,6 +36,22 @@ function ProductCard({ product }: ProductCardProps) {
 
 ## 컴포넌트 분리 기준
 
+### 파일 분리 원칙
+
+- 독립적으로 이름을 가진 React 컴포넌트는 별도 파일에 작성합니다.
+- 한 파일 안에 여러 React 컴포넌트를 함께 선언하지 않습니다.
+- 컴포넌트 파일명과 컴포넌트명은 동일하게 작성합니다.
+- 부모 컴포넌트는 분리된 자식 컴포넌트를 import하여 조립합니다.
+- Next.js가 지정한 `page.tsx`, `layout.tsx` 등의 특수 파일명은 예외로 합니다.
+
+예시:
+
+```text
+ProductForm.tsx
+SelectionButton.tsx
+ProductImageList.tsx
+```
+
 다음과 같은 경우 컴포넌트 분리를 고려합니다.
 
 - 여러 화면에서 반복해서 사용하는 UI

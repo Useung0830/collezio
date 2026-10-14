@@ -1,0 +1,177 @@
+import { randomUUID } from "node:crypto";
+
+import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { FieldValue, getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { error as logError } from "firebase-functions/logger";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+
+import {
+  cancelProductRegistration as cancelRegistration,
+  cleanExpiredProductRegistrations,
+} from "./cleanupProductRegistrations.js";
+import {
+  acknowledgeProductRegistration as acknowledgeRegistration,
+  beginProductRegistration as beginRegistration,
+  completeProductRegistration as completeRegistration,
+  getProductRegistration as getRegistration,
+} from "./manageProductRegistration.js";
+import { parseWithdrawalFeedback } from "./parseWithdrawalFeedback.js";
+import { processWithdrawal } from "./processWithdrawal.js";
+import { isNicknameAvailable } from "./profileNickname.js";
+import { saveProductImage } from "./saveProductImage.js";
+import { savePublicProfile } from "./savePublicProfile.js";
+
+initializeApp();
+const db = getFirestore();
+const services = () => ({ db, auth: getAuth(), bucket: getStorage().bucket() });
+
+const registrationOptions = {
+  region: "asia-northeast3",
+  timeoutSeconds: 120,
+  maxInstances: 10,
+};
+export const acknowledgeProductRegistration = onCall(
+  registrationOptions,
+  (request) =>
+    acknowledgeRegistration(services(), request.auth?.uid, request.data),
+);
+export const beginProductRegistration = onCall(registrationOptions, (request) =>
+  beginRegistration(services(), request.auth?.uid, request.data),
+);
+export const getProductRegistration = onCall(registrationOptions, (request) =>
+  getRegistration(services(), request.auth?.uid, request.data),
+);
+export const completeProductRegistration = onCall(
+  registrationOptions,
+  (request) =>
+    completeRegistration(services(), request.auth?.uid, request.data),
+);
+export const cancelProductRegistration = onCall(
+  registrationOptions,
+  (request) => cancelRegistration(services(), request.auth?.uid, request.data),
+);
+export const cleanupProductRegistrations = onSchedule(
+  {
+    region: "asia-northeast3",
+    schedule: "every 10 minutes",
+    timeoutSeconds: 540,
+  },
+  () => cleanExpiredProductRegistrations(services()),
+);
+
+export const uploadProductImage = onCall(
+  {
+    region: "asia-northeast3",
+    memory: "1GiB",
+    concurrency: 2,
+    maxInstances: 10,
+    timeoutSeconds: 120,
+  },
+  async (request) =>
+    saveProductImage(services(), request.auth?.uid, request.data),
+);
+
+export const checkNickname = onCall(
+  { region: "asia-northeast3" },
+  async (request) => ({
+    available: await isNicknameAvailable(
+      db,
+      request.data?.nickname,
+      request.auth?.uid,
+    ),
+  }),
+);
+
+export const saveProfile = onCall(
+  { region: "asia-northeast3" },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    return savePublicProfile(
+      db,
+      request.auth.uid,
+      request.data,
+      getStorage().bucket().name,
+    );
+  },
+);
+
+export const withdrawAccount = onCall(
+  { region: "asia-northeast3", timeoutSeconds: 540 },
+  async (request) => {
+    if (!request.auth)
+      throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    const userId = request.auth.uid;
+    const reference = db.doc(`withdrawalRequests/${userId}`);
+    const previous = await reference.get();
+    if (previous.exists) return { status: previous.get("status") };
+    const authTime = request.auth.token.auth_time;
+    if (typeof authTime !== "number" || Date.now() / 1000 - authTime > 300)
+      throw new HttpsError(
+        "failed-precondition",
+        "비밀번호를 다시 확인해주세요.",
+      );
+    let feedback;
+    try {
+      feedback = parseWithdrawalFeedback(request.data);
+    } catch {
+      throw new HttpsError(
+        "invalid-argument",
+        "탈퇴 사유 입력을 확인해주세요.",
+      );
+    }
+    // Auth를 먼저 삭제하면 실패한 데이터 정리를 재개할 근거가 없어지므로 접수를 먼저 기록합니다.
+    await db.runTransaction(async (transaction) => {
+      if ((await transaction.get(reference)).exists) return;
+      transaction.create(reference, {
+        status: "processing",
+        feedback,
+        feedbackId: randomUUID(),
+        createdAt: FieldValue.serverTimestamp(),
+        retryAt: Timestamp.now(),
+        stage: 0,
+        cursor: "",
+      });
+    });
+    try {
+      return { status: await processWithdrawal(services(), userId) };
+    } catch (error) {
+      logError("Withdrawal cleanup will retry", {
+        code: error.code ?? "unknown",
+      });
+      return { status: "processing" };
+    }
+  },
+);
+
+// 브라우저가 닫히거나 호출이 중단돼도 저장된 단계부터 재개합니다.
+export const retryWithdrawals = onSchedule(
+  {
+    region: "asia-northeast3",
+    schedule: "every 10 minutes",
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const requests = await db
+      .collection("withdrawalRequests")
+      .where("status", "==", "processing")
+      .where("retryAt", "<=", Timestamp.now())
+      .orderBy("retryAt")
+      .limit(10)
+      .get();
+    await Promise.all(
+      requests.docs.map(async (document) => {
+        try {
+          await processWithdrawal(services(), document.id);
+        } catch (error) {
+          logError("Withdrawal retry failed", {
+            code: error.code ?? "unknown",
+          });
+        }
+      }),
+    );
+  },
+);
