@@ -1,9 +1,8 @@
 import type { RefObject } from "react";
 
-import { PRODUCT_CATEGORIES } from "@/features/products/constants/productCategories";
+import ProductCategorySelect from "@/features/products/components/ProductCategorySelect";
 
 import ArrowRightIcon from "@/assets/icons/icon-arrow-right.svg";
-import DownSolidIcon from "@/assets/icons/icon-down-solid.svg";
 
 type HeaderSearchBarProps = {
   className?: string;
@@ -28,26 +27,13 @@ export default function HeaderSearchBar({
       className={`border-black-200 text-black-900 flex rounded-full border ${paddingClassName} ${className}`}
     >
       <div className="flex w-full min-w-0 items-center gap-2">
-        <div className="relative flex shrink-0 items-center">
-          <select
-            name="category"
-            aria-label="검색 카테고리"
-            defaultValue=""
-            tabIndex={tabIndex}
-            className={`${textClassName} max-w-24 cursor-pointer appearance-none bg-transparent pr-5 outline-none`}
-          >
-            <option value="">전체</option>
-            {PRODUCT_CATEGORIES.map((category) => (
-              <option key={category.value} value={category.value}>
-                {category.label}
-              </option>
-            ))}
-          </select>
-          <DownSolidIcon
-            className="pointer-events-none absolute right-0 size-4"
-            aria-hidden="true"
-          />
-        </div>
+        <ProductCategorySelect
+          name="category"
+          label="검색 카테고리"
+          includeAll
+          isCompact
+          tabIndex={tabIndex}
+        />
         <div className="border-black-200 h-6 shrink-0 border-l" />
         <input
           ref={inputRef}

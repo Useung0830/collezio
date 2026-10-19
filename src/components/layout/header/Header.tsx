@@ -15,6 +15,7 @@ import HeaderSearchBar from "./HeaderSearchBar";
 
 export default function Header() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(firebaseAuth, (user) => {
@@ -25,7 +26,10 @@ export default function Header() {
   return (
     <header className="flex w-full items-center justify-center px-4 py-3 max-lg:px-3">
       <div className="flex w-full max-w-280 items-center justify-between gap-5">
-        <Link href="/" className="shrink-0">
+        <Link
+          href="/"
+          className={`shrink-0 ${isMobileSearchOpen ? "max-lg:hidden" : ""}`}
+        >
           <LogoGnb
             className="h-8.75 w-32 max-lg:h-7.75 max-lg:w-28"
             aria-label="콜레지오 로고"
@@ -55,7 +59,10 @@ export default function Header() {
           {isLoggedIn === null ? (
             <HeaderActionsSkeleton isMobile />
           ) : (
-            <HeaderMobileActions isLoggedIn={isLoggedIn} />
+            <HeaderMobileActions
+              isLoggedIn={isLoggedIn}
+              onSearchOpenChange={setIsMobileSearchOpen}
+            />
           )}
         </div>
       </div>

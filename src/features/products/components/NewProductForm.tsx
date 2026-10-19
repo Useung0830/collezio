@@ -9,10 +9,8 @@ import IconButton from "@/components/common/button/IconButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
-import {
-  isProductCategory,
-  PRODUCT_CATEGORIES,
-} from "@/features/products/constants/productCategories";
+import ProductCategorySelect from "@/features/products/components/ProductCategorySelect";
+import { isProductCategory } from "@/features/products/constants/productCategories";
 import { useProductRegistrationQuery } from "@/features/products/hooks/useProductRegistrationQuery";
 import { useRegisterProductMutation } from "@/features/products/hooks/useRegisterProductMutation";
 import type {
@@ -220,24 +218,14 @@ export default function NewProductForm() {
             />
           </label>
 
-          <label className="text-label-16 text-black-900 flex flex-col gap-3">
-            카테고리
-            <select
+          <div className="text-label-16 text-black-900 flex flex-col gap-3">
+            <span>카테고리</span>
+            <ProductCategorySelect
               name="category"
+              label="상품 카테고리"
               required
-              defaultValue=""
-              className="border-black-300 text-body-16 text-black-900 focus:border-black-900 h-13 rounded-2xl border px-5 outline-none"
-            >
-              <option value="" disabled>
-                카테고리를 선택해주세요.
-              </option>
-              {PRODUCT_CATEGORIES.map((category) => (
-                <option key={category.value} value={category.value}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
           <label className="text-label-16 text-black-900 flex flex-col gap-3">
             자세한 설명

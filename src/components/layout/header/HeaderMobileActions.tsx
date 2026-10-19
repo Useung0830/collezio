@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import MenuIcon from "@/assets/icons/icon-menu.svg";
 import SearchIcon from "@/assets/icons/icon-search.svg";
@@ -10,10 +10,12 @@ import MobileMenuDrawer from "./MobileMenuDrawer";
 
 type HeaderMobileActionsProps = {
   isLoggedIn: boolean;
+  onSearchOpenChange: (isOpen: boolean) => void;
 };
 
 export default function HeaderMobileActions({
   isLoggedIn,
+  onSearchOpenChange,
 }: HeaderMobileActionsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -22,11 +24,13 @@ export default function HeaderMobileActions({
 
   const handleOpenSearch = () => {
     setIsSearchOpen(true);
+    onSearchOpenChange(true);
   };
 
-  const handleCloseSearch = () => {
+  const handleCloseSearch = useCallback(() => {
     setIsSearchOpen(false);
-  };
+    onSearchOpenChange(false);
+  }, [onSearchOpenChange]);
 
   const handleOpenMenu = () => {
     setIsMenuOpen(true);
@@ -61,7 +65,7 @@ export default function HeaderMobileActions({
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isMenuOpen, isSearchOpen]);
+  }, [handleCloseSearch, isMenuOpen, isSearchOpen]);
 
   useEffect(() => {
     if (isSearchOpen) {
@@ -88,16 +92,16 @@ export default function HeaderMobileActions({
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
     };
-  }, [isSearchOpen]);
+  }, [handleCloseSearch, isSearchOpen]);
 
   return (
     <div className="flex w-full min-w-0 items-center justify-end gap-5 lg:hidden">
       <div
         ref={searchContainerRef}
-        className={`origin-right overflow-hidden transition-all duration-300 ease-out ${
+        className={`origin-right transition-all duration-300 ease-out ${
           isSearchOpen
-            ? "max-w-full flex-1 opacity-100"
-            : "pointer-events-none max-w-0 opacity-0"
+            ? "max-w-full flex-1 overflow-visible opacity-100"
+            : "pointer-events-none max-w-0 overflow-hidden opacity-0"
         }`}
       >
         <HeaderSearchBar
