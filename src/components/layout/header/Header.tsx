@@ -54,7 +54,7 @@ export default function Header() {
             </Link>
           </li>
         </ul>
-        <div className="flex h-10 w-46 shrink-0 items-center justify-end max-lg:hidden">
+        <div className="flex h-10 shrink-0 items-center max-lg:hidden">
           {isLoggedIn === null ? (
             <HeaderActionsSkeleton />
           ) : (
