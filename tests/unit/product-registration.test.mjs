@@ -10,15 +10,21 @@ import { hashProductFile } from "../../src/features/products/utils/hashProductFi
 const product = {
   title: " 상품 ",
   description: " 설명 ",
+  category: "figure",
   transaction: { type: "sale", price: 0 },
   delivery: { type: "parcel", shippingFee: 0 },
 };
 test("서버 상품 검증은 정상 값을 정규화하고 과도한 길이·위조 필드·금액을 거부한다", () => {
   assert.equal(parseProductFields(product).title, "상품");
+  assert.equal(parseProductFields(product).category, "figure");
+  const legacyProduct = { ...product };
+  delete legacyProduct.category;
+  assert.equal(parseProductFields(legacyProduct).category, "other");
   for (const input of [
     { ...product, sellerId: "other" },
     { ...product, title: " " },
     { ...product, description: "x".repeat(5001) },
+    { ...product, category: "unknown" },
     { ...product, transaction: { type: "sale", price: -1 } },
     { ...product, transaction: { type: "sale", price: 1.5 } },
     { ...product, delivery: { type: "parcel", shippingFee: Infinity } },

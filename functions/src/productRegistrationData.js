@@ -6,6 +6,13 @@ import { HttpsError } from "firebase-functions/v2/https";
 export const REGISTRATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const UPLOAD_LEASE_MS = 5 * 60 * 1000;
 export const CLEANUP_GRACE_MS = 10 * 60 * 1000;
+export const PRODUCT_CATEGORIES = [
+  "figure",
+  "model-kit",
+  "plush",
+  "card",
+  "other",
+];
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const hashBuffer = (buffer) =>
@@ -27,7 +34,17 @@ export function assertKeys(value, keys) {
     throw new HttpsError("invalid-argument", "등록 정보를 확인해주세요.");
 }
 export function parseProductFields(value) {
-  assertKeys(value, ["title", "description", "transaction", "delivery"]);
+  const hasCategory = value && Object.hasOwn(value, "category");
+  assertKeys(
+    value,
+    hasCategory
+      ? ["title", "description", "category", "transaction", "delivery"]
+      : ["title", "description", "transaction", "delivery"],
+  );
+  // 배포 전에 시작된 등록 작업과 구버전 클라이언트는 기타로 분류합니다.
+  const category = hasCategory ? value.category : "other";
+  if (!PRODUCT_CATEGORIES.includes(category))
+    throw new HttpsError("invalid-argument", "상품 카테고리를 확인해주세요.");
   const text = (input, max) => {
     if (typeof input !== "string" || !input.trim() || input.trim().length > max)
       throw new HttpsError(
@@ -70,6 +87,7 @@ export function parseProductFields(value) {
   return {
     title: text(value.title, 100),
     description: text(value.description, 5000),
+    category,
     transaction,
     delivery,
   };

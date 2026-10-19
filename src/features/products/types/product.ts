@@ -1,5 +1,7 @@
 import type { StaticImageData } from "next/image";
 
+import type { ProductCategory } from "@/features/products/constants/productCategories";
+
 interface SaleTransaction {
   type: "sale";
   price: number;
@@ -24,6 +26,7 @@ export interface ProductImage {
 export interface CreateProductInput {
   title: string;
   description: string;
+  category: ProductCategory;
   transaction: ProductTransaction;
   delivery: ProductDelivery;
   images: ProductImage[];
@@ -32,6 +35,7 @@ export interface CreateProductInput {
 export interface ProductListItem {
   id: number | string;
   title: string;
+  category: ProductCategory | null;
   createdAt: string | null;
   image: StaticImageData | string | null;
   transaction: ProductTransaction;
