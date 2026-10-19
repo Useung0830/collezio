@@ -1,5 +1,7 @@
 import type { RefObject } from "react";
 
+import { PRODUCT_CATEGORIES } from "@/features/products/constants/productCategories";
+
 import ArrowRightIcon from "@/assets/icons/icon-arrow-right.svg";
 import DownSolidIcon from "@/assets/icons/icon-down-solid.svg";
 
@@ -22,24 +24,36 @@ export default function HeaderSearchBar({
   return (
     <form
       role="search"
-      action="/"
+      action="/search"
       className={`border-black-200 text-black-900 flex rounded-full border ${paddingClassName} ${className}`}
     >
       <div className="flex w-full min-w-0 items-center gap-2">
-        <button
-          type="button"
-          className={`flex shrink-0 items-center gap-1 whitespace-nowrap ${textClassName}`}
-          aria-label="검색 카테고리 선택"
-          tabIndex={tabIndex}
-        >
-          <span>전체</span>
-          <DownSolidIcon className="size-4" aria-hidden="true" />
-        </button>
+        <div className="relative flex shrink-0 items-center">
+          <select
+            name="category"
+            aria-label="검색 카테고리"
+            defaultValue=""
+            tabIndex={tabIndex}
+            className={`${textClassName} max-w-24 cursor-pointer appearance-none bg-transparent pr-5 outline-none`}
+          >
+            <option value="">전체</option>
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+          <DownSolidIcon
+            className="pointer-events-none absolute right-0 size-4"
+            aria-hidden="true"
+          />
+        </div>
         <div className="border-black-200 h-6 shrink-0 border-l" />
         <input
           ref={inputRef}
           type="search"
           name="query"
+          maxLength={100}
           aria-label="검색어"
           placeholder="검색어를 입력해주세요"
           className={`${textClassName} min-w-0 flex-1 outline-none`}

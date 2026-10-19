@@ -23,8 +23,9 @@ import { hashBuffer } from "../src/productRegistrationData.js";
 import { saveProductImage } from "../src/saveProductImage.js";
 
 const product = {
-  title: "피규어",
+  title: "원피스 피규어",
   description: "상품 설명",
+  category: "figure",
   transaction: { type: "sale", price: 10000 },
   delivery: { type: "parcel", shippingFee: 0 },
 };
@@ -196,6 +197,33 @@ test("서버 등록 작업의 복구·경합·만료 정리", async (t) => {
           { productId: input.registrationId },
           { productId: input.registrationId },
         ]);
+        const savedProduct = await db
+          .doc("products/" + input.registrationId)
+          .get();
+        assert.equal(savedProduct.get("category"), "figure");
+        assert.ok(savedProduct.get("titleTerms").includes("피규어"));
+        const searchResults = await db
+          .collection("products")
+          .where("category", "==", "figure")
+          .where("titleTerms", "array-contains", "피규어")
+          .orderBy("createdAt", "desc")
+          .get();
+        assert.ok(
+          searchResults.docs.some(
+            (document) => document.id === input.registrationId,
+          ),
+        );
+        const otherCategory = await db
+          .collection("products")
+          .where("category", "==", "plush")
+          .where("titleTerms", "array-contains", "피규어")
+          .orderBy("createdAt", "desc")
+          .get();
+        assert.ok(
+          !otherCategory.docs.some(
+            (document) => document.id === input.registrationId,
+          ),
+        );
         assert.equal((await ref.get()).get("status"), "committed");
         assert.equal((await ref.get()).get("cleanupAt"), undefined);
         assert.equal(
