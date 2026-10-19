@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { getProductMetadata } from "@/features/products/api/getProductMetadata";
-import RegisteredProductDetail from "@/features/products/components/RegisteredProductDetail";
+import RegisteredProductDetailGate from "@/features/products/components/RegisteredProductDetailGate";
 
 import { createShareMetadata } from "@/lib/createShareMetadata";
 
@@ -50,5 +50,5 @@ export default async function ProductDetailPage(
     notFound();
   }
 
-  return <RegisteredProductDetail productId={productId} />;
+  return <RegisteredProductDetailGate productId={productId} />;
 }

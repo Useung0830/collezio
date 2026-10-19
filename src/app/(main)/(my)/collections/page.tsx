@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import MyProductList from "@/features/products/components/MyProductList";
+import MyProductListGate from "@/features/products/components/MyProductListGate";
 import ProfileSummary from "@/features/user/components/ProfileSummary";
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default function CollectionsPage() {
   return (
     <div className="flex w-full flex-col gap-8">
       <ProfileSummary />
-      <MyProductList />
+      <MyProductListGate />
     </div>
   );
 }
