@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -35,7 +35,13 @@ export default function Header() {
             aria-label="콜레지오 로고"
           />
         </Link>
-        <HeaderSearchBar className="max-w-150 min-w-0 flex-1 max-lg:hidden" />
+        <Suspense
+          fallback={
+            <div className="border-black-200 h-11 max-w-150 min-w-0 flex-1 rounded-full border max-lg:hidden" />
+          }
+        >
+          <HeaderSearchBar className="max-w-150 min-w-0 flex-1 max-lg:hidden" />
+        </Suspense>
         <ul className="flex shrink-0 gap-5 max-lg:hidden">
           <li>
             <Link href="/chat" className="whitespace-nowrap">

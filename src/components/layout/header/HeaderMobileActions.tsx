@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import MenuIcon from "@/assets/icons/icon-menu.svg";
 import SearchIcon from "@/assets/icons/icon-search.svg";
@@ -104,11 +104,17 @@ export default function HeaderMobileActions({
             : "pointer-events-none max-w-0 overflow-hidden opacity-0"
         }`}
       >
-        <HeaderSearchBar
-          inputRef={searchInputRef}
-          isCompact
-          tabIndex={isSearchOpen ? 0 : -1}
-        />
+        <Suspense
+          fallback={
+            <div className="border-black-200 h-10 w-full rounded-full border" />
+          }
+        >
+          <HeaderSearchBar
+            inputRef={searchInputRef}
+            isCompact
+            tabIndex={isSearchOpen ? 0 : -1}
+          />
+        </Suspense>
       </div>
 
       {!isSearchOpen && (

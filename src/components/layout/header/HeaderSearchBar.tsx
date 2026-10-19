@@ -1,6 +1,10 @@
+"use client";
+
 import type { RefObject } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import ProductCategorySelect from "@/features/products/components/ProductCategorySelect";
+import { isProductCategory } from "@/features/products/constants/productCategories";
 
 import ArrowRightIcon from "@/assets/icons/icon-arrow-right.svg";
 
@@ -17,6 +21,14 @@ export default function HeaderSearchBar({
   isCompact = false,
   tabIndex,
 }: HeaderSearchBarProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchText =
+    pathname === "/search" ? (searchParams.get("query") ?? "") : "";
+  const categoryParam =
+    pathname === "/search" ? searchParams.get("category") : null;
+  const category =
+    categoryParam && isProductCategory(categoryParam) ? categoryParam : "";
   const textClassName = isCompact ? "text-body-14" : "text-body-16";
   const paddingClassName = isCompact ? "px-2 py-1.5" : "px-3 py-2";
 
@@ -28,17 +40,21 @@ export default function HeaderSearchBar({
     >
       <div className="flex w-full min-w-0 items-center gap-2">
         <ProductCategorySelect
+          key={category}
           name="category"
           label="검색 카테고리"
+          defaultValue={category}
           includeAll
           isCompact
           tabIndex={tabIndex}
         />
         <div className="border-black-200 h-6 shrink-0 border-l" />
         <input
+          key={searchText}
           ref={inputRef}
           type="search"
           name="query"
+          defaultValue={searchText}
           maxLength={100}
           aria-label="검색어"
           placeholder="검색어를 입력해주세요"

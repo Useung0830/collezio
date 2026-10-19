@@ -42,19 +42,6 @@ export default function SearchProductResults({
       <h1 className="text-heading-24 mb-4">
         {searchText ? `‘${searchText}’ 검색 결과` : "상품 둘러보기"}
       </h1>
-      <form action="/search" role="search" className="mb-6 flex gap-2">
-        {category && <input type="hidden" name="category" value={category} />}
-        <input
-          type="search"
-          name="query"
-          defaultValue={searchText}
-          maxLength={100}
-          aria-label="상품 제목 검색어"
-          placeholder="상품 제목의 단어를 입력해주세요"
-          className="border-black-300 text-body-16 text-black-900 min-w-0 flex-1 rounded-xl border px-4 py-3"
-        />
-        <Button type="submit">검색</Button>
-      </form>
       <nav aria-label="상품 카테고리" className="mb-8 flex flex-wrap gap-2">
         <Link
           href={getSearchHref(searchText, null)}

@@ -9,6 +9,7 @@ import CheckIcon from "@/assets/icons/icon-check.svg";
 import DownIcon from "@/assets/icons/icon-down-solid.svg";
 
 type ProductCategorySelectProps = {
+  defaultValue?: ProductCategory | "";
   includeAll?: boolean;
   isCompact?: boolean;
   label: string;
@@ -19,6 +20,7 @@ type ProductCategorySelectProps = {
 };
 
 export default function ProductCategorySelect({
+  defaultValue = "",
   includeAll = false,
   isCompact = false,
   label,
@@ -33,7 +35,7 @@ export default function ProductCategorySelect({
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<
     ProductCategory | ""
-  >("");
+  >(defaultValue);
   const [isOpen, setIsOpen] = useState(false);
 
   const options: ReadonlyArray<{ value: ProductCategory | ""; label: string }> =
