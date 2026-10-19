@@ -1,18 +1,24 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import Button from "@/components/common/button/Button";
 import IconButton from "@/components/common/button/IconButton";
 import LinkButton from "@/components/common/button/LinkButton";
-import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
-import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
 import ProfileAvatar from "@/features/user/components/ProfileAvatar";
 import { useProfileUserId } from "@/features/user/hooks/useProfileUserId";
 import { usePublicProfileQuery } from "@/features/user/hooks/usePublicProfileQuery";
 
 import CloseIcon from "@/assets/icons/icon-close.svg";
 import RightIcon from "@/assets/icons/icon-right.svg";
+
+const LogoutConfirmModal = dynamic(
+  () => import("@/features/auth/components/LogoutConfirmModal"),
+);
+const WithdrawalModal = dynamic(
+  () => import("@/features/auth/components/WithdrawalModal"),
+);
 
 type MobileMenuDrawerProps = {
   isLoggedIn: boolean;
@@ -41,6 +47,13 @@ export default function MobileMenuDrawer({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const isDrawerOpen = isOpen && isVisible;
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const handleToggleExchange = () => {
     setIsExchangeOpen((isOpen) => !isOpen);
@@ -78,12 +91,12 @@ export default function MobileMenuDrawer({
 
   return (
     <div
-      className={`fixed inset-0 z-50 ${isOpen ? "pointer-events-auto" : "pointer-events-none"}`}
-      inert={!isOpen}
+      className={`fixed inset-0 z-50 ${isDrawerOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+      inert={!isDrawerOpen}
     >
       <button
         className={`absolute inset-0 bg-black/20 transition-opacity duration-300 ${
-          isOpen ? "opacity-100" : "opacity-0"
+          isDrawerOpen ? "opacity-100" : "opacity-0"
         }`}
         aria-label="메뉴 닫기"
         onClick={onClose}
@@ -91,7 +104,7 @@ export default function MobileMenuDrawer({
       <aside
         aria-label="전체 메뉴"
         className={`border-black-200 absolute top-0 right-0 h-full w-65 border-l bg-white shadow-xl transition-transform duration-300 ${
-          isOpen ? "translate-x-0" : "translate-x-full"
+          isDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
         <div className="border-black-200 flex min-h-14 items-center justify-between border-b px-4">

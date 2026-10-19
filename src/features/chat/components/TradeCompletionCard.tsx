@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { updateTradeCompletion } from "@/features/chat/api/updateTradeCompletion";
-import TradeReviewDialog from "@/features/chat/components/TradeReviewDialog";
 import { useTradeCompletion } from "@/features/chat/hooks/useTradeCompletion";
 import type { TradeProposal } from "@/features/chat/types/tradeProposal";
+
+const TradeReviewDialog = dynamic(
+  () => import("@/features/chat/components/TradeReviewDialog"),
+);
 
 interface TradeCompletionCardProps {
   roomId: string;

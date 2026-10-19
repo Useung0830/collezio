@@ -13,12 +13,11 @@ const INITIAL_VISIBLE_PRODUCT_COUNT = 10;
 const PRODUCT_LOAD_COUNT = 10;
 
 export default function NewProductList() {
-  const productsQuery = useNewProductsQuery();
+  const { data: products } = useNewProductsQuery();
   const [visibleProductCount, setVisibleProductCount] = useState(
     INITIAL_VISIBLE_PRODUCT_COUNT,
   );
 
-  const products = productsQuery.data ?? [];
   const visibleProducts = products.slice(0, visibleProductCount);
   const hasMoreProducts = visibleProductCount < products.length;
 
@@ -33,25 +32,7 @@ export default function NewProductList() {
       <h2 id="new-products-title" className="text-heading-24 mb-4 md:mb-6">
         NEW
       </h2>
-      {productsQuery.isPending ? (
-        <p role="status" className="text-body-16 py-10 text-center">
-          {productsQuery.isPaused
-            ? "인터넷 연결을 확인해주세요."
-            : "상품을 불러오고 있습니다."}
-        </p>
-      ) : productsQuery.isError ? (
-        <div className="flex flex-col items-center gap-3 py-10">
-          <p role="alert" className="text-body-16">
-            상품을 불러오지 못했습니다. 다시 시도해주세요.
-          </p>
-          <Button
-            onClick={() => void productsQuery.refetch()}
-            disabled={productsQuery.isFetching}
-          >
-            다시 시도
-          </Button>
-        </div>
-      ) : products.length === 0 ? (
+      {products.length === 0 ? (
         <p
           role="status"
           className="text-body-16 text-black-600 py-10 text-center"

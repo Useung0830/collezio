@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import FavoriteProductList from "@/features/favorite/components/FavoriteProductList";
+import FavoriteProductListGate from "@/features/favorite/components/FavoriteProductListGate";
 import ProfileSummary from "@/features/user/components/ProfileSummary";
 
 export const metadata: Metadata = {
@@ -12,7 +12,7 @@ export default function FavoritesPage() {
   return (
     <div className="flex w-full flex-col gap-7">
       <ProfileSummary />
-      <FavoriteProductList />
+      <FavoriteProductListGate />
     </div>
   );
 }

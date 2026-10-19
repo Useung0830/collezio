@@ -1,30 +1,13 @@
-import { useEffect, useState } from "react";
-import { skipToken, useQuery } from "@tanstack/react-query";
-import { onAuthStateChanged } from "firebase/auth";
+import { useSuspenseQuery } from "@tanstack/react-query";
 
 import { getFavoriteProducts } from "@/features/favorite/api/getFavoriteProducts";
 import { favoriteQueryKeys } from "@/features/favorite/queries/favoriteQueryKeys";
 
-import { firebaseAuth } from "@/lib/firebase";
-
-export function useFavoriteProductsQuery() {
-  const [userId, setUserId] = useState<string | null>();
-  const productsQuery = useQuery({
+export function useFavoriteProductsQuery(userId: string) {
+  return useSuspenseQuery({
     queryKey: favoriteQueryKeys.list(userId),
-    queryFn: userId ? () => getFavoriteProducts(userId) : skipToken,
+    queryFn: () => getFavoriteProducts(userId),
     gcTime: 0,
     retry: false,
   });
-
-  useEffect(
-    () =>
-      onAuthStateChanged(firebaseAuth, (user) => setUserId(user?.uid ?? null)),
-    [],
-  );
-
-  return {
-    ...productsQuery,
-    isAuthLoading: userId === undefined,
-    isLoggedIn: Boolean(userId),
-  };
 }
