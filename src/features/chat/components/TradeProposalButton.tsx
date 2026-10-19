@@ -1,16 +1,22 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { createTradeProposal } from "@/features/chat/api/createTradeProposal";
-import TradeProductPicker from "@/features/chat/components/TradeProductPicker";
-import TradeProposalForm from "@/features/chat/components/TradeProposalForm";
 import { useTradeCompletion } from "@/features/chat/hooks/useTradeCompletion";
 import { useTradeProposals } from "@/features/chat/hooks/useTradeProposals";
 import type { ChatRoomView } from "@/features/chat/types/registeredChatRoom";
 import type { TradeTerms } from "@/features/chat/types/tradeProposal";
 import { getRegisteredProduct } from "@/features/products/api/getRegisteredProduct";
+
+const TradeProductPicker = dynamic(
+  () => import("@/features/chat/components/TradeProductPicker"),
+);
+const TradeProposalForm = dynamic(
+  () => import("@/features/chat/components/TradeProposalForm"),
+);
 
 export default function TradeProposalButton({
   room,

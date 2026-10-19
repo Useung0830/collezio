@@ -1,14 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 
-import ChatBlockDialog from "@/features/chat/components/ChatBlockDialog";
-import ChatReportDialog from "@/features/chat/components/ChatReportDialog";
 import { useChatBlockStatus } from "@/features/chat/hooks/useChatBlockStatus";
 import type { ChatParticipantInput } from "@/features/chat/types/chatModeration";
 
 import BlockIcon from "@/assets/icons/icon-block.svg";
 import SirenIcon from "@/assets/icons/icon-siren.svg";
+
+const ChatBlockDialog = dynamic(
+  () => import("@/features/chat/components/ChatBlockDialog"),
+);
+const ChatReportDialog = dynamic(
+  () => import("@/features/chat/components/ChatReportDialog"),
+);
 
 export default function ChatRoomActions(props: ChatParticipantInput) {
   const block = useChatBlockStatus(props.userId, props.partnerId);

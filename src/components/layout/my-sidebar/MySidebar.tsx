@@ -1,11 +1,17 @@
 "use client";
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import Button from "@/components/common/button/Button";
-import LogoutConfirmModal from "@/features/auth/components/LogoutConfirmModal";
-import WithdrawalModal from "@/features/auth/components/WithdrawalModal";
+
+const LogoutConfirmModal = dynamic(
+  () => import("@/features/auth/components/LogoutConfirmModal"),
+);
+const WithdrawalModal = dynamic(
+  () => import("@/features/auth/components/WithdrawalModal"),
+);
 
 const exchangeMenus = [{ label: "보유품 목록", href: "/collections" }];
 

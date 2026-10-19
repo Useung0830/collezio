@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import MenuIcon from "@/assets/icons/icon-menu.svg";
 import SearchIcon from "@/assets/icons/icon-search.svg";
 
 import HeaderSearchBar from "./HeaderSearchBar";
-import MobileMenuDrawer from "./MobileMenuDrawer";
+
+const MobileMenuDrawer = dynamic(() => import("./MobileMenuDrawer"), {
+  ssr: false,
+});
 
 type HeaderMobileActionsProps = {
   isLoggedIn: boolean;
@@ -16,6 +20,7 @@ export default function HeaderMobileActions({
   isLoggedIn,
 }: HeaderMobileActionsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hasOpenedMenu, setHasOpenedMenu] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +34,7 @@ export default function HeaderMobileActions({
   };
 
   const handleOpenMenu = () => {
+    setHasOpenedMenu(true);
     setIsMenuOpen(true);
   };
 
@@ -116,11 +122,13 @@ export default function HeaderMobileActions({
         <MenuIcon className="text-black-900 size-6" aria-hidden="true" />
       </button>
 
-      <MobileMenuDrawer
-        isLoggedIn={isLoggedIn}
-        isOpen={isMenuOpen}
-        onClose={handleCloseMenu}
-      />
+      {hasOpenedMenu && (
+        <MobileMenuDrawer
+          isLoggedIn={isLoggedIn}
+          isOpen={isMenuOpen}
+          onClose={handleCloseMenu}
+        />
+      )}
     </div>
   );
 }

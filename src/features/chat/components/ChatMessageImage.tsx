@@ -1,17 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { getBlob, getMetadata, ref } from "firebase/storage";
 
 import Button from "@/components/common/button/Button";
-import ChatImageViewer from "@/features/chat/components/ChatImageViewer";
 import { getChatImageRows } from "@/features/chat/utils/getChatImageRows";
 import { MAX_CHAT_IMAGE_BYTES } from "@/features/chat/utils/validateChatImage";
 
 import { firebaseStorage } from "@/lib/firebase";
 import { validateFirebaseUser } from "@/lib/validateFirebaseUser";
+
+const ChatImageViewer = dynamic(
+  () => import("@/features/chat/components/ChatImageViewer"),
+);
 
 interface ChatMessageImageProps {
   paths: string[];

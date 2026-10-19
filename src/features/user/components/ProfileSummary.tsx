@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 
 import Button from "@/components/common/button/Button";
-import ProfileEditModal from "@/features/user/components/ProfileEditModal";
 import PublicProfileCard from "@/features/user/components/PublicProfileCard";
 import { useProfileUserId } from "@/features/user/hooks/useProfileUserId";
 import { usePublicProfileQuery } from "@/features/user/hooks/usePublicProfileQuery";
+
+const ProfileEditModal = dynamic(
+  () => import("@/features/user/components/ProfileEditModal"),
+);
 
 export default function ProfileSummary() {
   const userId = useProfileUserId();
