@@ -117,3 +117,67 @@ test("닉네임 동시 등록·기존 사용자 중복·변경 후 재사용을 
     await deleteApp(app);
   }
 });
+
+test("Google 가입은 동의와 닉네임을 함께 저장하며 재시도로 덮어쓰지 않는다", async () => {
+  assert.ok(process.env.FIRESTORE_EMULATOR_HOST);
+  const app = initializeApp({ projectId: "demo-collezio" }, randomUUID());
+  const db = getFirestore(app);
+  const userId = randomUUID();
+  const nickname = randomUUID().slice(0, 8);
+  const next = randomUUID().slice(0, 8);
+  const profile = db.doc("profiles/" + userId);
+  const consent = db.doc("users/" + userId + "/account/signup");
+  const claim = db.doc("nicknames/" + getNicknameKey(nickname));
+  const oldClaim = db.doc("nicknames/" + getNicknameKey(next));
+  const signup = (extra = {}) =>
+    savePublicProfile(
+      db,
+      userId,
+      {
+        mode: "complete-signup",
+        nickname,
+        hasAcceptedTerms: true,
+        hasAcceptedPrivacy: true,
+        ...extra,
+      },
+      "demo-collezio.appspot.com",
+    );
+  try {
+    await assert.rejects(signup({ hasAcceptedTerms: false }), {
+      code: "invalid-argument",
+    });
+    await assert.rejects(signup({ hasAcceptedPrivacy: "true" }), {
+      code: "invalid-argument",
+    });
+    assert.equal((await profile.get()).exists, false);
+    // 기존 로그인 테스트에서 만들어진 프로필도 동의 후 가입 완료로 전환합니다.
+    await savePublicProfile(
+      db,
+      userId,
+      { mode: "create", nickname: next },
+      "demo-collezio.appspot.com",
+    );
+    await claim.set({ userId: "another-user" });
+    await assert.rejects(signup(), { code: "already-exists" });
+    assert.equal((await consent.get()).exists, false);
+    await claim.delete();
+    assert.equal((await signup()).profile.googleSignupCompleted, true);
+    const savedConsent = await consent.get();
+    assert.equal(savedConsent.get("hasAcceptedTerms"), true);
+    assert.equal(savedConsent.get("hasAcceptedPrivacy"), true);
+    assert.ok(savedConsent.get("acceptedAt"));
+    assert.equal((await signup({ nickname: next })).profile.nickname, nickname);
+    assert.equal(
+      (await consent.get()).get("acceptedAt").toMillis(),
+      savedConsent.get("acceptedAt").toMillis(),
+    );
+  } finally {
+    await Promise.all([
+      profile.delete(),
+      consent.delete(),
+      claim.delete(),
+      oldClaim.delete(),
+    ]);
+    await deleteApp(app);
+  }
+});

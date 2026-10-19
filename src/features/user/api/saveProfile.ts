@@ -3,8 +3,10 @@ import { httpsCallable } from "firebase/functions";
 import { firebaseFunctions } from "@/lib/firebase";
 
 type SaveProfileInput = {
-  mode: "create" | "update";
+  mode: "create" | "update" | "complete-signup";
   nickname: string;
+  hasAcceptedTerms?: boolean;
+  hasAcceptedPrivacy?: boolean;
   image?: { path: string; url: string };
 };
 

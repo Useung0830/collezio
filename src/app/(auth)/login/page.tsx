@@ -3,8 +3,8 @@ import Link from "next/link";
 
 import Button from "@/components/common/button/Button";
 import LoginForm from "@/components/LoginForm";
+import GoogleLoginButton from "@/features/auth/components/GoogleLoginButton";
 
-import GooleLogoIcon from "@/assets/icons/icon-google-logo.svg";
 import KakaoLogoIcon from "@/assets/icons/icon-kakao-logo.svg";
 import LogoGnb from "@/assets/images/logo-gnb.svg";
 
@@ -49,10 +49,7 @@ export default function LoginPage() {
             <KakaoLogoIcon className="absolute left-5 size-4" />
             <span className="text-body-16 text-black-900">카카오로 계속</span>
           </Button>
-          <Button shape="square" className="relative">
-            <GooleLogoIcon className="absolute left-5 size-4" />
-            <span className="text-body-16 text-black-900">Google로 계속</span>
-          </Button>
+          <GoogleLoginButton />
         </div>
       </div>
     </main>

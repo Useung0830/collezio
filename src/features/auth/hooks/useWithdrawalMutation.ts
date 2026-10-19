@@ -2,10 +2,10 @@ import { useRef } from "react";
 import { toast } from "react-toastify/unstyled";
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { FirebaseError } from "firebase/app";
 import { signOut } from "firebase/auth";
 
 import { deleteAccount } from "@/features/auth/api/deleteAccount";
+import { getWithdrawalError } from "@/features/auth/utils/getWithdrawalError";
 
 import { firebaseAuth } from "@/lib/firebase";
 
@@ -41,18 +41,9 @@ export function useWithdrawalMutation() {
       isRunning.current = false;
     }
   };
-  let errorMessage = "";
-  if (mutation.error instanceof FirebaseError) {
-    const code = mutation.error.code;
-    errorMessage = [
-      "auth/invalid-credential",
-      "auth/wrong-password",
-      "auth/invalid-login-credentials",
-    ].includes(code)
-      ? "비밀번호가 올바르지 않습니다. 다시 확인해주세요."
-      : code === "auth/too-many-requests"
-        ? "요청이 많습니다. 잠시 후 다시 시도해주세요."
-        : "탈퇴 처리 상태를 확인하지 못했습니다. 연결 상태를 확인하고 다시 시도해주세요.";
-  } else if (mutation.error) errorMessage = mutation.error.message;
-  return { withdraw, isPending: mutation.isPending, errorMessage };
+  return {
+    withdraw,
+    isPending: mutation.isPending,
+    errorMessage: getWithdrawalError(mutation.error),
+  };
 }

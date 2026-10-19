@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Toast from "@/components/common/Toast";
 import QueryProvider from "@/components/QueryProvider";
 import AuthQueryCleanup from "@/features/auth/components/AuthQueryCleanup";
+import GoogleSignupGate from "@/features/auth/components/GoogleSignupGate";
 
 import { getSiteUrl } from "@/lib/getSiteUrl";
 
@@ -24,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="text-body-16 text-black-900 bg-[#fdfdfd]">
         <QueryProvider>
           <AuthQueryCleanup />
-          {children}
+          <GoogleSignupGate>{children}</GoogleSignupGate>
         </QueryProvider>
         <Toast />
       </body>
