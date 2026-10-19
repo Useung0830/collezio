@@ -17,6 +17,7 @@ import {
   REGISTRATION_TTL_MS,
   registrationView,
 } from "./productRegistrationData.js";
+import { getProductTitleTerms } from "./productSearchTerms.js";
 
 export async function beginProductRegistration(services, userId, input) {
   await assertRegistrationUser(services, userId);
@@ -132,8 +133,10 @@ export async function completeProductRegistration(services, userId, input) {
         "failed-precondition",
         "프로필을 확인한 뒤 다시 등록해주세요.",
       );
+    const productFields = parseProductFields(data.product);
     tx.create(productRef, {
-      ...parseProductFields(data.product),
+      ...productFields,
+      titleTerms: getProductTitleTerms(productFields.title),
       images: data.files.map((file) => file.image),
       sellerId: userId,
       status: "available",

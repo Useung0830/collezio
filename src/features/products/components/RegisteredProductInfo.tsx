@@ -1,5 +1,6 @@
 import ProductGallery from "@/features/products/components/ProductGallery";
 import RegisteredProductActions from "@/features/products/components/RegisteredProductActions";
+import { getProductCategoryLabel } from "@/features/products/constants/productCategories";
 import type { RegisteredProductDetail } from "@/features/products/types/product";
 import PublicProfileCard from "@/features/user/components/PublicProfileCard";
 
@@ -36,6 +37,11 @@ export default function RegisteredProductInfo({
         <header className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <h1 className="text-heading-24 wrap-anywhere">{product.title}</h1>
+            {product.category && (
+              <p className="text-body-14 text-black-600">
+                {getProductCategoryLabel(product.category)}
+              </p>
+            )}
             {product.createdAt && (
               <time
                 className="text-label-16 text-black-400"

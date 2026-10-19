@@ -11,6 +11,7 @@ import {
 const storedProduct = {
   sellerId: "seller-uid",
   title: "교환할 피규어",
+  category: "figure",
   transaction: { type: "exchange", desiredItemName: "탄지로 피규어" },
   images: [
     {
@@ -28,6 +29,7 @@ test("등록 API가 저장한 문서를 문자열 ID와 대표 사진을 가진 
   assert.equal(product.image, storedProduct.images[0].url);
   assert.equal(product.createdAt, "2026-09-21T00:00:00.000Z");
   assert.equal(product.status, "available");
+  assert.equal(product.category, "figure");
   assert.deepEqual(product.transaction, storedProduct.transaction);
   assert.equal(product.favoriteCount, 0);
   assert.equal(product.chatCount, 0);
@@ -55,12 +57,14 @@ test("사진·등록일·알 수 없는 상태는 가짜 값 대신 빈 값으�
     images: [],
     createdAt: null,
     status: "unexpected",
+    category: "unknown",
     favoriteCount: -1,
     chatCount: "2",
   });
   assert.equal(product.image, null);
   assert.equal(product.createdAt, null);
   assert.equal(product.status, null);
+  assert.equal(product.category, null);
   assert.equal(product.favoriteCount, 0);
   assert.equal(product.chatCount, 0);
 });

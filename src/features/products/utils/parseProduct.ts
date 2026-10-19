@@ -70,6 +70,14 @@ export function parseProductListItem(
   return {
     id,
     title: data.title,
+    category:
+      data.category === "figure" ||
+      data.category === "model-kit" ||
+      data.category === "plush" ||
+      data.category === "card" ||
+      data.category === "other"
+        ? data.category
+        : null,
     transaction: parseTransaction(data.transaction),
     image: getImageUrl(data.images),
     createdAt:

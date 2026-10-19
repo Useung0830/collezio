@@ -9,6 +9,8 @@ import IconButton from "@/components/common/button/IconButton";
 import ToggleButton from "@/components/common/button/ToggleButton";
 import ImageUploader from "@/components/common/ImageUploader";
 import RadioOption from "@/components/common/radio-group/RadioOption";
+import ProductCategorySelect from "@/features/products/components/ProductCategorySelect";
+import { isProductCategory } from "@/features/products/constants/productCategories";
 import { useProductRegistrationQuery } from "@/features/products/hooks/useProductRegistrationQuery";
 import { useRegisterProductMutation } from "@/features/products/hooks/useRegisterProductMutation";
 import type {
@@ -84,9 +86,15 @@ export default function NewProductForm() {
     const formData = new FormData(event.currentTarget);
     const title = String(formData.get("title") ?? "").trim();
     const description = String(formData.get("description") ?? "").trim();
+    const category = String(formData.get("category") ?? "");
 
     if (!title || !description) {
       toast.error("제목과 자세한 설명을 입력해주세요.");
+      return;
+    }
+
+    if (!isProductCategory(category)) {
+      toast.error("카테고리를 선택해주세요.");
       return;
     }
 
@@ -141,7 +149,14 @@ export default function NewProductForm() {
       delivery = { type: "parcel", shippingFee: fee };
     }
 
-    handleRegister({ title, description, transaction, delivery, files });
+    handleRegister({
+      title,
+      description,
+      category,
+      transaction,
+      delivery,
+      files,
+    });
   };
 
   const isExchange = transactionType === "exchange";
@@ -202,6 +217,15 @@ export default function NewProductForm() {
               className="border-black-300 text-body-16 text-black-900 placeholder:text-black-400 focus:border-black-900 h-13 rounded-2xl border px-5 outline-none"
             />
           </label>
+
+          <div className="text-label-16 text-black-900 flex flex-col gap-3">
+            <span>카테고리</span>
+            <ProductCategorySelect
+              name="category"
+              label="상품 카테고리"
+              required
+            />
+          </div>
 
           <label className="text-label-16 text-black-900 flex flex-col gap-3">
             자세한 설명
