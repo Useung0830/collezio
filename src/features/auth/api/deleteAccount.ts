@@ -1,8 +1,14 @@
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  GoogleAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
+} from "firebase/auth";
 import { doc, getDocFromServer } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
 import type { WithdrawalFeedback } from "@/features/auth/types/withdrawal";
+import { isGoogleOnlyUser } from "@/features/auth/utils/isGoogleOnlyUser";
 
 import { firebaseAuth, firebaseDb, firebaseFunctions } from "@/lib/firebase";
 
@@ -13,11 +19,18 @@ export async function deleteAccount({
   password,
 }: {
   feedback: WithdrawalFeedback;
-  password: string;
+  password?: string;
 }): Promise<WithdrawalResult> {
   const user = firebaseAuth.currentUser;
   if (!user?.email) throw new Error("로그인 후 다시 시도해주세요.");
   if (!navigator.onLine) throw new Error("인터넷 연결 후 다시 시도해주세요.");
+  const isGoogleAccount = isGoogleOnlyUser(user);
+  // 사용자 클릭 직후 팝업을 열어 비동기 조회로 인한 브라우저 팝업 차단을 피합니다.
+  if (isGoogleAccount) {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await reauthenticateWithPopup(user, provider);
+  }
   const reference = doc(firebaseDb, "withdrawalRequests", user.uid);
   const previous = await getDocFromServer(reference);
   if (previous.exists())
@@ -25,10 +38,16 @@ export async function deleteAccount({
       status:
         previous.data().status === "completed" ? "completed" : "processing",
     };
-  await reauthenticateWithCredential(
-    user,
-    EmailAuthProvider.credential(user.email, password),
-  );
+  if (!isGoogleAccount) {
+    if (!password) throw new Error("비밀번호를 입력해주세요.");
+    await reauthenticateWithCredential(
+      user,
+      EmailAuthProvider.credential(user.email, password),
+    );
+  }
+  if (firebaseAuth.currentUser?.uid !== user.uid) {
+    throw new Error("로그인 상태가 변경되었습니다. 다시 로그인해주세요.");
+  }
   await user.getIdToken(true);
   try {
     const withdraw = httpsCallable<WithdrawalFeedback, WithdrawalResult>(

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { ChangeEvent, FormEvent } from "react";
 import { useId, useState } from "react";
@@ -8,6 +8,9 @@ import WithdrawalFeedbackFields from "@/features/auth/components/WithdrawalFeedb
 import { useWithdrawalDialog } from "@/features/auth/hooks/useWithdrawalDialog";
 import { useWithdrawalMutation } from "@/features/auth/hooks/useWithdrawalMutation";
 import type { WithdrawalFeedback } from "@/features/auth/types/withdrawal";
+import { isGoogleOnlyUser } from "@/features/auth/utils/isGoogleOnlyUser";
+
+import { firebaseAuth } from "@/lib/firebase";
 
 type WithdrawalModalProps = { onClose: () => void; onConfirm: () => void };
 
@@ -29,11 +32,18 @@ export default function WithdrawalModal({
     detail: "",
   });
   const [password, setPassword] = useState("");
+  const isGoogleAccount = isGoogleOnlyUser(firebaseAuth.currentUser);
   const handlePasswordChange = (event: ChangeEvent<HTMLInputElement>) =>
     setPassword(event.currentTarget.value);
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (await withdraw({ feedback, password })) onConfirm();
+    if (
+      await withdraw({
+        feedback,
+        password: isGoogleAccount ? undefined : password,
+      })
+    )
+      onConfirm();
   };
   return (
     <dialog
@@ -58,18 +68,25 @@ export default function WithdrawalModal({
           탈퇴하면 계정, 상품·이미지, 게시글·댓글이 삭제되며 복구할 수 없습니다.
           채팅은 상대방에게 탈퇴 회원으로 표시되어 남습니다.
         </p>
-        <label className="text-label-14 mt-4 flex flex-col gap-2">
-          본인 확인을 위한 비밀번호
-          <input
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            disabled={isPending}
-            onChange={handlePasswordChange}
-            className="border-black-300 text-body-16 rounded-xl border p-3"
-          />
-        </label>
+        {isGoogleAccount ? (
+          <p className="text-body-14 mt-4">
+            Google 계정 확인 후 탈퇴가 진행됩니다. 현재 로그인한 계정을
+            선택해주세요.
+          </p>
+        ) : (
+          <label className="text-label-14 mt-4 flex flex-col gap-2">
+            본인 확인을 위한 비밀번호
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              disabled={isPending}
+              onChange={handlePasswordChange}
+              className="border-black-300 text-body-16 rounded-xl border p-3"
+            />
+          </label>
+        )}
         {errorMessage && (
           <p role="alert" className="text-body-14 mt-3 text-red-500">
             {errorMessage}
@@ -90,7 +107,7 @@ export default function WithdrawalModal({
             disabled={isPending}
             isLoading={isPending}
           >
-            회원 탈퇴
+            {isGoogleAccount ? "Google 인증 후 탈퇴" : "회원 탈퇴"}
           </Button>
         </div>
       </form>

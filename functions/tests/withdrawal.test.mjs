@@ -86,6 +86,12 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   batch.set(db.doc(`profiles/${id}`), { nickname: "삭제할 닉네임" });
   const nicknameClaim = db.doc(`nicknames/${getNicknameKey("삭제할 닉네임")}`);
   batch.set(nicknameClaim, { userId: id });
+  const signupConsent = db.doc(`users/${id}/account/signup`);
+  batch.set(signupConsent, {
+    hasAcceptedTerms: true,
+    hasAcceptedPrivacy: true,
+    acceptedAt: Timestamp.now(),
+  });
   batch.set(room, {
     requesterId: "other",
     sellerId: id,
@@ -139,6 +145,7 @@ test("부분 실패 후 재시도는 집계를 중복 차감하지 않고 계정
   assert.equal((await ownPost.get()).exists, false);
   assert.equal((await db.doc(`profiles/${id}`).get()).exists, false);
   assert.equal((await nicknameClaim.get()).exists, false);
+  assert.equal((await signupConsent.get()).exists, false);
   assert.equal(
     (await db.doc(`communityComments/related-${suffix}`).get()).exists,
     false,
